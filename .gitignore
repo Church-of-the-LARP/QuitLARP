@@ -4,5 +4,6 @@ dist/
 frontend/src/api/schema.ts
 .env
 .env.*
+!.env.example
 .DS_Store
 /backend/backend

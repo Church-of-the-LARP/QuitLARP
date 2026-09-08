@@ -2,156 +2,64 @@ package main
 
 import (
 	"context"
-	"embed"
 	"log"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
-	"github.com/pressly/goose/v3"
+
+	"backend/auth"
+	"backend/config"
+	"backend/database"
+	"backend/handlers"
+	"backend/mailer"
+	"backend/middleware"
 )
 
-//go:embed migrations/*.sql
-var migrations embed.FS
-
-type User struct {
-	ID   int64  `json:"id" db:"id"`
-	Name string `json:"name" db:"name"`
-}
-
-type HealthOutput struct {
-	Body struct {
-		Status string `json:"status"`
-	}
-}
-
-type UserListOutput struct {
-	Body struct {
-		Users []User `json:"users"`
-	}
-}
-
-type UserCreateInput struct {
-	Body struct {
-		Name string `json:"name"`
-	}
-}
-
-type UserCreateOutput struct {
-	Body struct {
-		User User `json:"user"`
-	}
-}
-
-func cors(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func connectDB(dsn string) (*sqlx.DB, error) {
-	var db *sqlx.DB
-	var err error
-	for range 30 {
-		db, err = sqlx.Connect("pgx", dsn)
-		if err == nil {
-			return db, nil
-		}
-		log.Printf("database not ready: %v", err)
-		time.Sleep(time.Second)
-	}
-	return nil, err
-}
-
-func register(api huma.API, db *sqlx.DB) {
-	huma.Register(api, huma.Operation{
-		OperationID: "getHealth",
-		Method:      http.MethodGet,
-		Path:        "/api/v1/health",
-		Summary:     "Check service health",
-	}, func(ctx context.Context, _ *struct{}) (*HealthOutput, error) {
-		if err := db.PingContext(ctx); err != nil {
-			return nil, huma.NewError(http.StatusServiceUnavailable, "database unavailable")
-		}
-		resp := &HealthOutput{}
-		resp.Body.Status = "ok"
-		return resp, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "listUsers",
-		Method:      http.MethodGet,
-		Path:        "/api/v1/users",
-		Summary:     "List users",
-	}, func(ctx context.Context, _ *struct{}) (*UserListOutput, error) {
-		users := []User{}
-		if err := db.SelectContext(ctx, &users, "SELECT id, name FROM users ORDER BY id"); err != nil {
-			return nil, huma.NewError(http.StatusInternalServerError, "could not list users")
-		}
-		resp := &UserListOutput{}
-		resp.Body.Users = users
-		return resp, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "createUser",
-		Method:      http.MethodPost,
-		Path:        "/api/v1/users",
-		Summary:     "Create a user",
-	}, func(ctx context.Context, input *UserCreateInput) (*UserCreateOutput, error) {
-		name := strings.TrimSpace(input.Body.Name)
-		if name == "" {
-			return nil, huma.NewError(http.StatusBadRequest, "name is required")
-		}
-		var id int64
-		if err := db.GetContext(ctx, &id, "INSERT INTO users (name) VALUES ($1) RETURNING id", name); err != nil {
-			return nil, huma.NewError(http.StatusInternalServerError, "could not create user")
-		}
-		resp := &UserCreateOutput{}
-		resp.Body.User = User{ID: id, Name: name}
-		return resp, nil
-	})
-}
-
 func main() {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		log.Fatal("DATABASE_URL is required")
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("config: %v", err)
 	}
 
-	db, err := connectDB(dsn)
+	db, err := database.Connect(cfg.DatabaseURL, 30, time.Second)
 	if err != nil {
-		log.Fatalf("could not connect to database: %v", err)
+		log.Fatalf("database: %v", err)
 	}
 	defer db.Close()
 
-	goose.SetBaseFS(migrations)
-	goose.SetDialect("postgres")
-	if err := goose.Up(db.DB, "migrations"); err != nil {
-		log.Fatalf("could not run migrations: %v", err)
+	if err := database.Migrate(db); err != nil {
+		log.Fatalf("migrations: %v", err)
+	}
+	if err := database.SeedSuperadmin(context.Background(), db,
+		cfg.Superadmin.Username, cfg.Superadmin.Email, cfg.Superadmin.Password); err != nil {
+		log.Fatalf("seed superadmin: %v", err)
 	}
 
-	mux := http.NewServeMux()
-	api := humago.New(mux, huma.DefaultConfig("CodingTest API", "0.1.0"))
-	register(api, db)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8888"
+	tokens := auth.New(cfg.JWTSecret, cfg.SessionTTL, cfg.ActionTokenTTL)
+	google := auth.NewGoogleClient(cfg.Google.ClientID, cfg.Google.ClientSecret, cfg.Google.RedirectURL)
+	if !google.Enabled() {
+		log.Printf("INFO: Google OAuth disabled (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET not set) — /api/v1/auth/google returns 501")
 	}
-	addr := ":" + port
-	log.Printf("listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, cors(mux)))
+	hs := handlers.New(db, cfg, mailer.NewMock(cfg.EmailFrom), tokens, google)
+
+	// The typed, OpenAPI-documented API lives on its own mux...
+	apiMux := http.NewServeMux()
+	api := humago.New(apiMux, huma.DefaultConfig("QuitLARP API", "0.1.0"))
+	hs.Register(api)
+
+	// ...while the browser-redirect OAuth endpoints are plain http handlers
+	// registered directly on the root mux (longer path prefix wins).
+	root := http.NewServeMux()
+	root.HandleFunc("GET /api/v1/auth/google", hs.GoogleAuthStart)
+	root.HandleFunc("GET /api/v1/auth/google/callback", hs.GoogleAuthCallback)
+	// CookieJar buffers huma responses so session cookies can be attached;
+	// Authenticate parses the session token (cookie or Bearer) per request.
+	root.Handle("/", middleware.CookieJar(middleware.Authenticate(tokens, apiMux)))
+
+	addr := ":" + cfg.Port
+	log.Printf("listening on %s (env=%s)", addr, cfg.Env)
+	log.Printf("frontend: %s | openapi: http://localhost%s/openapi.json", cfg.FrontendURL, addr)
+	log.Fatal(http.ListenAndServe(addr, middleware.CORS(cfg.CORSOrigins)(root)))
 }
