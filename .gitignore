@@ -1,0 +1,8 @@
+.cache/
+node_modules/
+dist/
+frontend/src/api/schema.ts
+.env
+.env.*
+.DS_Store
+/backend/backend
