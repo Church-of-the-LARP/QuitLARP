@@ -22,7 +22,11 @@ interface AuthContextValue {
   user: User | null;
   googleHref: string;
   signIn: (email: string, password: string) => Promise<ActionResult>;
-  signUp: (username: string, email: string, password: string) => Promise<ActionResult>;
+  signUp: (
+    username: string,
+    email: string,
+    password: string,
+  ) => Promise<ActionResult>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
   resendVerification: () => Promise<ActionResult>;
@@ -35,7 +39,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  // Bootstrap: restore the session from the auth cookie.
   useEffect(() => {
     let cancelled = false;
     client
@@ -86,7 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setUser(res.data?.user ?? null);
       return {
-        notice: "Account created — check your inbox for the verification email.",
+        notice:
+          "Account created — check your inbox for the verification email.",
       };
     },
     [],

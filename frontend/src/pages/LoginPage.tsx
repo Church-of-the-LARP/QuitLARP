@@ -1,21 +1,28 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAuth, type ActionResult } from "../auth/AuthContext";
-import { client, errorMessage } from "../api/client";
-import { Field, Notice } from "../components/ui";
+import { Notice } from "../components/Notice";
 
-export function LoginPage({
-  onShowRegister,
-  googleNotice,
-}: {
-  onShowRegister: () => void;
-  googleNotice?: string;
-}) {
+export function LoginPage() {
   const { signIn, googleHref } = useAuth();
-  const [mode, setMode] = useState<"login" | "forgot">("login");
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [result, setResult] = useState<ActionResult>({});
+  const [result, setResult] = useState<ActionResult>(() => {
+    const state = location.state as { notice?: string } | null;
+    return state?.notice ? { notice: state.notice } : {};
+  });
   const [busy, setBusy] = useState(false);
+  const [googleNotice] = useState(() => searchParams.get("error"));
+
+  useEffect(() => {
+    if (searchParams.has("error")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("error");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -28,84 +35,60 @@ export function LoginPage({
     }
   }
 
-  async function requestReset(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setResult({});
-    try {
-      const res = await client.POST("/api/v1/auth/forgot-password", {
-        body: { email: email.trim() },
-      });
-      setResult(
-        res.error
-          ? { error: errorMessage(res.error, "Could not send the reset link") }
-          : {
-              notice:
-                res.data?.message ??
-                "If an account exists for that email, a reset link is on its way.",
-            },
-      );
-      setMode("login");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <div className="mx-auto w-full max-w-sm">
-      <h1 className="text-2xl font-semibold">Sign in</h1>
-      <p className="mt-1 text-sm text-gray-500">to QuitLARP</p>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
+      <div className="w-full rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+        <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
+          QuitLARP
+        </div>
+        <div className="mx-auto w-full max-w-sm">
+          <h1 className="text-2xl font-semibold">Sign in</h1>
+          <p className="mt-1 text-sm text-gray-500">to QuitLARP</p>
 
-      {googleNotice && <div className="mt-4"><Notice kind="error">{googleNotice}</Notice></div>}
-      {result.error && <div className="mt-4"><Notice kind="error">{result.error}</Notice></div>}
-      {result.notice && <div className="mt-4"><Notice kind="notice">{result.notice}</Notice></div>}
+          {googleNotice && (
+            <div className="mt-4">
+              <Notice kind="error">{googleNotice}</Notice>
+            </div>
+          )}
+          {result.error && (
+            <div className="mt-4">
+              <Notice kind="error">{result.error}</Notice>
+            </div>
+          )}
+          {result.notice && (
+            <div className="mt-4">
+              <Notice kind="notice">{result.notice}</Notice>
+            </div>
+          )}
 
-      {mode === "forgot" ? (
-        <form onSubmit={requestReset} className="mt-6 space-y-4">
-          <Field
-            label="Email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {busy ? "Sending…" : "Send reset link"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("login")}
-            className="w-full text-center text-sm text-gray-500 hover:text-gray-800"
-          >
-            ← Back to sign in
-          </button>
-        </form>
-      ) : (
-        <>
           <form onSubmit={submit} className="mt-6 space-y-4">
-            <Field
-              label="Email"
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-            />
-            <Field
-              label="Password"
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                Email
+              </span>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                Password
+              </span>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </label>
             <button
               type="submit"
               disabled={busy}
@@ -116,13 +99,12 @@ export function LoginPage({
           </form>
 
           <div className="mt-3 text-right">
-            <button
-              type="button"
-              onClick={() => setMode("forgot")}
+            <Link
+              to="/forgot-password"
               className="text-sm text-gray-500 hover:text-gray-800"
             >
               Forgot password?
-            </button>
+            </Link>
           </div>
 
           <div className="my-5 flex items-center gap-3 text-xs text-gray-400">
@@ -140,16 +122,15 @@ export function LoginPage({
 
           <p className="mt-5 text-center text-sm text-gray-500">
             No account yet?{" "}
-            <button
-              type="button"
-              onClick={onShowRegister}
+            <Link
+              to="/register"
               className="font-medium text-blue-600 hover:underline"
             >
               Register
-            </button>
+            </Link>
           </p>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
