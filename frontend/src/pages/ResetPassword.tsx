@@ -1,50 +1,53 @@
-import { useState, type FormEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { client, errorMessage } from "../api/client";
-import { Notice } from "../components/Notice";
+import { useState, type FormEvent } from 'react';
+import Alert from '../components/Alert.tsx';
+import { Link, useSearchParams } from 'react-router-dom';
+import client, { getErrorText } from '../scripts/api.ts';
+import type { AlertMessage } from '../types/types.ts';
 
-export function ResetPasswordPage() {
+function App() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token") ?? "";
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [result, setResult] = useState<{
-    kind: "error" | "notice";
-    text: string;
-  } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const token = searchParams.get('token') ?? '';
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [alertMsg, setAlertMsg] = useState<AlertMessage | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function submit(e: FormEvent) {
+  const handleReset = async (e: FormEvent) => {
     e.preventDefault();
-    setResult(null);
-    if (password.length < 8) {
-      setResult({
-        kind: "error",
-        text: "Password must be at least 8 characters",
+    setAlertMsg(null);
+
+    if (newPass.length < 8) {
+      setAlertMsg({
+        kind: 'error',
+        text: 'Password must be at least 8 characters',
       });
       return;
     }
-    if (password !== confirm) {
-      setResult({ kind: "error", text: "Passwords do not match" });
+    if (newPass !== confirmPass) {
+      setAlertMsg({ kind: 'error', text: 'Passwords do not match' });
       return;
     }
-    setBusy(true);
+
+    setLoading(true);
     try {
-      const res = await client.POST("/api/v1/auth/reset-password", {
-        body: { token, newPassword: password },
+      const res = await client.POST('/api/v1/auth/reset-password', {
+        body: { token, newPassword: newPass },
       });
-      setResult(
+      setAlertMsg(
         res.error
           ? {
-              kind: "error",
-              text: errorMessage(res.error, "Could not reset the password"),
+              kind: 'error',
+              text: getErrorText(res.error, 'Could not reset the password'),
             }
-          : { kind: "notice", text: res.data?.message ?? "Password updated." },
+          : { kind: 'notice', text: res.data?.message ?? 'Password updated.' },
       );
+    } catch (err) {
+      console.error('Reset password error:', err);
+      setAlertMsg({ kind: 'error', text: 'Could not reset the password' });
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="mx-auto w-full max-w-sm">
@@ -53,13 +56,13 @@ export function ResetPasswordPage() {
         Choose a new password for your account
       </p>
 
-      {result && (
+      {alertMsg && (
         <div className="mt-4">
-          <Notice kind={result.kind}>{result.text}</Notice>
+          <Alert kind={alertMsg.kind} text={alertMsg.text} />
         </div>
       )}
 
-      {result?.kind === "notice" ? (
+      {alertMsg?.kind === 'notice' ? (
         <Link
           to="/login"
           className="mt-6 block w-full rounded-md bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-700"
@@ -67,7 +70,7 @@ export function ResetPasswordPage() {
           Go to sign in
         </Link>
       ) : (
-        <form onSubmit={submit} className="mt-6 space-y-4">
+        <form onSubmit={handleReset} className="mt-6 space-y-4">
           <label className="block">
             <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
               New password
@@ -76,8 +79,8 @@ export function ResetPasswordPage() {
               type="password"
               required
               autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={newPass}
+              onChange={(e) => setNewPass(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
           </label>
@@ -89,20 +92,22 @@ export function ResetPasswordPage() {
               type="password"
               required
               autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              value={confirmPass}
+              onChange={(e) => setConfirmPass(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
           </label>
           <button
             type="submit"
-            disabled={busy}
+            disabled={loading}
             className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {busy ? "Updating…" : "Update password"}
+            {loading ? 'Updating…' : 'Update password'}
           </button>
         </form>
       )}
     </div>
   );
 }
+
+export default App;

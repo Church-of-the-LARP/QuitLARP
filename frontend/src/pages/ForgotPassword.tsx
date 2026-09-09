@@ -1,37 +1,41 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { client, errorMessage } from "../api/client";
-import { Notice } from "../components/Notice";
+import { useState, type FormEvent } from 'react';
+import Alert from '../components/Alert.tsx';
+import { Link, useNavigate } from 'react-router-dom';
+import client, { getErrorText } from '../scripts/api.ts';
 
-export function ForgotPasswordPage() {
+function App() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function submit(e: FormEvent) {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setBusy(true);
-    setError(null);
+    setLoading(true);
+    setAlertMsg(null);
     try {
-      const res = await client.POST("/api/v1/auth/forgot-password", {
-        body: { email: email.trim() },
+      const res = await client.POST('/api/v1/auth/forgot-password', {
+        body: { email: resetEmail.trim() },
       });
       if (res.error) {
-        setError(errorMessage(res.error, "Could not send the reset link"));
+        setAlertMsg(getErrorText(res.error, 'Could not send the reset link'));
         return;
       }
-      navigate("/login", {
+
+      navigate('/login', {
         state: {
           notice:
             res.data?.message ??
-            "If an account exists for that email, a reset link is on its way.",
+            'If an account exists for that email, a reset link is on its way.',
         },
       });
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      setAlertMsg('Could not send the reset link');
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="mx-auto w-full max-w-sm">
@@ -40,13 +44,13 @@ export function ForgotPasswordPage() {
         Enter your email and we'll send you a reset link
       </p>
 
-      {error && (
+      {alertMsg && (
         <div className="mt-4">
-          <Notice kind="error">{error}</Notice>
+          <Alert kind="error" text={alertMsg} />
         </div>
       )}
 
-      <form onSubmit={submit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <label className="block">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
             Email
@@ -55,18 +59,18 @@ export function ForgotPasswordPage() {
             type="email"
             required
             autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={resetEmail}
+            onChange={(e) => setResetEmail(e.target.value)}
             placeholder="you@example.com"
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
           />
         </label>
         <button
           type="submit"
-          disabled={busy}
+          disabled={loading}
           className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
         >
-          {busy ? "Sending…" : "Send reset link"}
+          {loading ? 'Sending…' : 'Send reset link'}
         </button>
         <Link
           to="/login"
@@ -78,3 +82,5 @@ export function ForgotPasswordPage() {
     </div>
   );
 }
+
+export default App;

@@ -1,49 +1,53 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useAuth, type ActionResult, type Role } from "../auth/AuthContext";
-import { canViewUsers } from "./UsersPage";
-import { Notice } from "../components/Notice";
+import { useState } from 'react';
+import Alert from '../components/Alert.tsx';
+import { Link } from 'react-router-dom';
+import useAuth from '../scripts/useAuth.tsx';
+import type { ActionResult, Role } from '../types/types.ts';
 
 const roleStyles: Record<Role, string> = {
-  user: "bg-gray-100 text-gray-700",
-  admin: "bg-violet-100 text-violet-700",
-  superadmin: "bg-amber-100 text-amber-800",
+  user: 'bg-gray-100 text-gray-700',
+  admin: 'bg-violet-100 text-violet-700',
+  superadmin: 'bg-amber-100 text-amber-800',
 };
 
 function VerifyEmailBanner() {
   const { user, resendVerification } = useAuth();
-  const [result, setResult] = useState<ActionResult>({});
+  const [alertMsg, setAlertMsg] = useState<ActionResult>({});
 
-  async function resend() {
-    setResult(await resendVerification());
-  }
+  const handleResend = async () => {
+    setAlertMsg(await resendVerification());
+  };
 
   return (
     <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
       <p className="font-medium">Verify your email address</p>
       <p className="mt-0.5 text-amber-700">
-        We emailed a verification link to{" "}
-        <span className="font-semibold">{user?.email}</span>. Didn't get it?{" "}
+        We emailed a verification link to{' '}
+        <span className="font-semibold">{user?.email}</span>. Didn't get it?{' '}
         <button
-          onClick={() => void resend()}
+          onClick={() => handleResend()}
           className="font-semibold underline underline-offset-2 hover:text-amber-900"
         >
           Resend the email
         </button>
         .
       </p>
-      {result.error && <Notice kind="error">{result.error}</Notice>}
-      {result.notice && <Notice kind="notice">{result.notice}</Notice>}
+      {alertMsg.error && <Alert kind="error" text={alertMsg.error} />}
+      {alertMsg.notice && <Alert kind="notice" text={alertMsg.notice} />}
     </div>
   );
 }
 
-export function DashboardPage() {
-  const { user, signOut } = useAuth();
+function App() {
+  const { user, logoutUser } = useAuth();
 
-  if (!user) {
-    return null;
-  }
+  const handleLogout = async () => {
+    await logoutUser();
+  };
+
+  if (!user) return null;
+
+  const isAdmin = user.role === 'admin' || user.role === 'superadmin';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -53,7 +57,7 @@ export function DashboardPage() {
             <Link to="/" className="text-sm font-semibold text-gray-900">
               QuitLARP
             </Link>
-            {canViewUsers(user.role) && (
+            {isAdmin && (
               <Link
                 to="/users"
                 className="text-sm text-gray-500 hover:text-gray-800"
@@ -74,7 +78,7 @@ export function DashboardPage() {
               {user.role}
             </span>
             <button
-              onClick={() => void signOut()}
+              onClick={() => handleLogout()}
               className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
             >
               Sign out
@@ -102,3 +106,5 @@ export function DashboardPage() {
     </div>
   );
 }
+
+export default App;

@@ -1,26 +1,38 @@
-import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
-import { useAuth, type ActionResult } from "../auth/AuthContext";
-import { Notice } from "../components/Notice";
+import { useState, type FormEvent } from 'react';
+import Alert from '../components/Alert.tsx';
+import { Link } from 'react-router-dom';
+import useAuth from '../scripts/useAuth.tsx';
+import { apiUrl } from '../scripts/api.ts';
+import type { ActionResult } from '../types/types.ts';
 
-export function RegisterPage() {
-  const { signUp, googleHref } = useAuth();
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [result, setResult] = useState<ActionResult>({});
-  const [busy, setBusy] = useState(false);
+function App() {
+  const googleUrl = `${apiUrl}/api/v1/auth/google`;
+  const { registerUser } = useAuth();
+  const [registerName, setRegisterName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPass, setRegisterPass] = useState('');
+  const [alertMsg, setAlertMsg] = useState<ActionResult>({});
+  const [loading, setLoading] = useState(false);
 
-  async function submit(e: FormEvent) {
+  const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
-    setBusy(true);
-    setResult({});
+    setLoading(true);
+    setAlertMsg({});
     try {
-      setResult(await signUp(username.trim(), email.trim(), password));
+      setAlertMsg(
+        await registerUser(
+          registerName.trim(),
+          registerEmail.trim(),
+          registerPass,
+        ),
+      );
+    } catch (err) {
+      console.error('Register error:', err);
+      setAlertMsg({ error: 'Something went wrong while creating the account' });
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
@@ -34,18 +46,18 @@ export function RegisterPage() {
             Username, email and a strong password
           </p>
 
-          {result.error && (
+          {alertMsg.error && (
             <div className="mt-4">
-              <Notice kind="error">{result.error}</Notice>
+              <Alert kind="error" text={alertMsg.error} />
             </div>
           )}
-          {result.notice && (
+          {alertMsg.notice && (
             <div className="mt-4">
-              <Notice kind="notice">{result.notice}</Notice>
+              <Alert kind="notice" text={alertMsg.notice} />
             </div>
           )}
 
-          <form onSubmit={submit} className="mt-6 space-y-4">
+          <form onSubmit={handleRegister} className="mt-6 space-y-4">
             <label className="block">
               <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
                 Username
@@ -56,8 +68,8 @@ export function RegisterPage() {
                 maxLength={32}
                 pattern="[A-Za-z0-9_-]+"
                 autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={registerName}
+                onChange={(e) => setRegisterName(e.target.value)}
                 placeholder="jane_doe"
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               />
@@ -70,8 +82,8 @@ export function RegisterPage() {
                 type="email"
                 required
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={registerEmail}
+                onChange={(e) => setRegisterEmail(e.target.value)}
                 placeholder="you@example.com"
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               />
@@ -84,18 +96,18 @@ export function RegisterPage() {
                 type="password"
                 required
                 autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={registerPass}
+                onChange={(e) => setRegisterPass(e.target.value)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               />
             </label>
             <p className="text-xs text-gray-400">At least 8 characters.</p>
             <button
               type="submit"
-              disabled={busy}
+              disabled={loading}
               className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
             >
-              {busy ? "Creating account…" : "Register"}
+              {loading ? 'Creating account…' : 'Register'}
             </button>
           </form>
 
@@ -106,14 +118,14 @@ export function RegisterPage() {
           </div>
 
           <a
-            href={googleHref}
+            href={googleUrl}
             className="block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Continue with Google
           </a>
 
           <p className="mt-5 text-center text-sm text-gray-500">
-            Already registered?{" "}
+            Already registered?{' '}
             <Link
               to="/login"
               className="font-medium text-blue-600 hover:underline"
@@ -126,3 +138,5 @@ export function RegisterPage() {
     </div>
   );
 }
+
+export default App;
