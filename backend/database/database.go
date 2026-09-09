@@ -38,3 +38,11 @@ func IsUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
+
+// IsForeignKeyViolation reports whether err is a postgres foreign-key
+// violation (SQLSTATE 23503), e.g. inserting a row that references a
+// deleted parent.
+func IsForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
+}

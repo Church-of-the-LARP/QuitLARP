@@ -44,6 +44,10 @@ func (h *Handlers) Register(api huma.API) {
 	h.registerAuth(api)
 	h.registerEmailFlows(api)
 	h.registerUsers(api)
+	h.registerAssessments(api)
+	h.registerAssessmentChapters(api)
+	h.registerAssessmentTests(api)
+	h.registerTags(api)
 }
 
 // validEmail does a light syntax check (format only; ownership is proven by
