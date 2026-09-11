@@ -35,14 +35,14 @@ function App() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
-      <div className="w-full rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6">
+      <div className="w-126 rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-sm">
+        <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-zinc-100">
           QuitLARP
         </div>
         <div className="mx-auto w-full max-w-sm">
-          <h1 className="text-2xl font-semibold">Create your account</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-semibold text-zinc-100">Create your account</h1>
+          <p className="mt-1 text-sm text-zinc-400">
             Username, email and a strong password
           </p>
 
@@ -59,7 +59,7 @@ function App() {
 
           <form onSubmit={handleRegister} className="mt-6 space-y-4">
             <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
                 Username
               </span>
               <input
@@ -71,11 +71,11 @@ function App() {
                 value={registerName}
                 onChange={(e) => setRegisterName(e.target.value)}
                 placeholder="jane_doe"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
                 Email
               </span>
               <input
@@ -85,11 +85,11 @@ function App() {
                 value={registerEmail}
                 onChange={(e) => setRegisterEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
                 Password
               </span>
               <input
@@ -98,37 +98,37 @@ function App() {
                 autoComplete="current-password"
                 value={registerPass}
                 onChange={(e) => setRegisterPass(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
               />
             </label>
-            <p className="text-xs text-gray-400">At least 8 characters.</p>
+            <p className="text-xs text-zinc-500">At least 8 characters.</p>
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              className="w-full rounded-md bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 disabled:opacity-60"
             >
               {loading ? 'Creating account…' : 'Register'}
             </button>
           </form>
 
-          <div className="my-5 flex items-center gap-3 text-xs text-gray-400">
-            <span className="h-px flex-1 bg-gray-200" />
+          <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
+            <span className="h-px flex-1 bg-zinc-800" />
             or
-            <span className="h-px flex-1 bg-gray-200" />
+            <span className="h-px flex-1 bg-zinc-800" />
           </div>
 
           <a
             href={googleUrl}
-            className="block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="block w-full rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-center text-sm font-medium text-zinc-300 hover:bg-zinc-700"
           >
             Continue with Google
           </a>
 
-          <p className="mt-5 text-center text-sm text-gray-500">
+          <p className="mt-5 text-center text-sm text-zinc-400">
             Already registered?{' '}
             <Link
               to="/login"
-              className="font-medium text-blue-600 hover:underline"
+              className="font-medium text-teal-400 hover:underline"
             >
               Sign in
             </Link>

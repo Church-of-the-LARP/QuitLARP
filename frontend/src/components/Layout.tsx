@@ -14,33 +14,33 @@ export default function Layout() {
   const isAdmin = user.role === "admin" || user.role === "superadmin";
 
   const roleStyles: Record<Role, string> = {
-    user: "bg-gray-100 text-gray-700",
-    admin: "bg-violet-100 text-violet-700",
-    superadmin: "bg-amber-100 text-amber-800",
+    user: "bg-zinc-700 text-zinc-300",
+    admin: "bg-teal-400/20 text-teal-400",
+    superadmin: "bg-amber-400/20 text-amber-400",
   };
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50">
-        <header className="border-b border-gray-200 bg-white">
+      <div className="min-h-screen bg-zinc-950">
+        <header className="border-b border-zinc-800 bg-zinc-900">
           <div className="mx-auto flex w-[75vw] items-center justify-between py-3">
             <div className="flex items-center gap-4">
-              <Link to="/" className="text-sm font-semibold text-gray-900">
+              <Link to="/" className="text-sm font-semibold text-zinc-100">
                 QuitLARP
               </Link>
               {isAdmin && (
                 <Link
                   to="/users"
-                  className="text-sm text-gray-500 hover:text-gray-800"
+                  className="text-sm text-zinc-400 hover:text-zinc-100"
                 >
                   Users
                 </Link>
               )}
             </div>
             <div className="flex items-center gap-3">
-              <span className="hidden text-sm text-gray-600 sm:inline">
+              <span className="hidden text-sm text-zinc-400 sm:inline">
                 {user.username}
-                <span className="mx-1.5 text-gray-300">·</span>
+                <span className="mx-1.5 text-zinc-600">·</span>
                 {user.email}
               </span>
               <span
@@ -50,7 +50,7 @@ export default function Layout() {
               </span>
               <button
                 onClick={() => handleLogout()}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-400 hover:bg-zinc-800"
               >
                 Sign out
               </button>

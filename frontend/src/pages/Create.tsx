@@ -151,196 +151,250 @@ export default function Create() {
   };
 
   return (
-    <form onSubmit={handleCreateAssessment} className="space-y-4">
-      <div>
-        <label className="mb-1 block font-medium">Title</label>
-        <input
-          type="text"
-          name="title"
-          required
-          className="w-90 rounded-xl border px-3 py-2"
-          placeholder="Title"
-        />
-      </div>
+    <main className="mx-auto w-[60vw] flex flex-col gap-5 py-6">
+      <h1 className="font-bold text-3xl mb-6 text-zinc-100">Create assessment</h1>
 
-      <div>
-        <label className="mb-1 block font-medium">Description</label>
-        <input
-          type="text"
-          name="description"
-          required
-          className="w-90 rounded-xl border px-3 py-2"
-          placeholder="Description"
-        />
-      </div>
+      <form onSubmit={handleCreateAssessment} className="flex flex-col gap-5">
+        <div className="rounded-xl border border-zinc-700 bg-zinc-800 p-6 flex flex-col gap-8">
+          <section>
+            <h2 className="mb-4 text-lg font-semibold text-zinc-100">Assessment details</h2>
 
-      <div>
-        <label className="mb-1 block font-medium">Difficulty</label>
-        <select
-          name="difficulty"
-          defaultValue="easy"
-          className="w-90 rounded-xl border px-3 py-2"
-        >
-          <option value="easy">Easy</option>
-          <option value="medium">Medium</option>
-          <option value="hard">Hard</option>
-        </select>
-      </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="mb-1 block font-semibold text-zinc-200">Assessment title</label>
+                <input
+                  type="text"
+                  name="title"
+                  required
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="Title"
+                />
+              </div>
 
-      <div>
-        <label className="mb-1 block font-medium">Time limit in minutes</label>
-        <input
-          type="number"
-          name="timeLimitMinutes"
-          required
-          min={1}
-          className="w-90 rounded-xl border px-3 py-2"
-          placeholder="Time in minutes"
-        />
-      </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1 block font-semibold text-zinc-200">Assessment description</label>
+                <input
+                  type="text"
+                  name="description"
+                  required
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="What is this assessment about?"
+                />
+              </div>
 
-      <div>
-        <label className="mb-1 block font-medium">Template file name</label>
-        <input
-          type="text"
-          name="templateFileName"
-          required
-          className="w-90 rounded-xl border px-3 py-2"
-          placeholder="main.py"
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block font-medium">Template content</label>
-        <textarea
-          name="templateContent"
-          className="w-90 rounded-xl border px-3 py-2"
-          placeholder="Paste the starting template code here"
-          rows={6}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block font-medium">Tags</label>
-        <input
-          type="text"
-          name="tags"
-          className="w-90 rounded-xl border px-3 py-2"
-          placeholder="tag1, tag2, tag3"
-        />
-      </div>
-
-      <div className="rounded-xl border p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Chapters</h3>
-          <button
-            type="button"
-            onClick={addChapter}
-            className="rounded-xl border border-blue-600 px-3 py-1 text-sm text-blue-600"
-          >
-            + Add chapter
-          </button>
-        </div>
-
-        {chapters.map((chapter, index) => (
-          <div key={index} className="mb-4 rounded-xl border p-3 last:mb-0">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="font-medium">Chapter {chapter.number}</span>
-              {chapters.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeChapter(index)}
-                  className="text-sm text-red-600"
+              <div>
+                <label className="mb-1 block font-semibold text-zinc-200">Difficulty level</label>
+                <select
+                  name="difficulty"
+                  defaultValue="easy"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
                 >
-                  Remove
-                </button>
-              )}
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-zinc-200">
+                  Time limit (minutes)
+                </label>
+                <input
+                  type="number"
+                  name="timeLimitMinutes"
+                  required
+                  min={1}
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="e.g. 60"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-zinc-200">
+                  Starter template file name
+                </label>
+                <input
+                  type="text"
+                  name="templateFileName"
+                  required
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="main.py"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-zinc-200">
+                  Tags (comma separated)
+                </label>
+                <input
+                  type="text"
+                  name="tags"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="tag1, tag2, tag3"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="mb-1 block font-semibold text-zinc-200">
+                  Starter template content
+                </label>
+                <textarea
+                  name="templateContent"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="Paste the starting template code here"
+                  rows={6}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="border-t border-zinc-700 pt-8">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-100">Chapters</h2>
+              <button
+                type="button"
+                onClick={addChapter}
+                className="text-zinc-950 px-3 py-1 bg-teal-500 hover:bg-teal-400 rounded-xl text-sm font-semibold"
+              >
+                + Add chapter
+              </button>
             </div>
 
-            <div>
-              <label className="mb-1 block font-medium">Chapter title</label>
-              <input
-                type="text"
-                value={chapter.title}
-                onChange={(e) => updateChapter(index, 'title', e.target.value)}
-                className="w-90 rounded-xl border px-3 py-2"
-                placeholder="Chapter title"
-              />
+            <div className="flex flex-col gap-3">
+              {chapters.map((chapter, index) => (
+                <div
+                  key={index}
+                  className="rounded-xl border border-zinc-700 bg-zinc-900 p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="font-semibold text-zinc-100">
+                      Chapter {chapter.number}
+                    </span>
+                    {chapters.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeChapter(index)}
+                        className="text-sm text-rose-400 hover:text-rose-300"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block font-semibold text-zinc-200">
+                        Chapter title
+                      </label>
+                      <input
+                        type="text"
+                        value={chapter.title}
+                        onChange={(e) =>
+                          updateChapter(index, 'title', e.target.value)
+                        }
+                        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                        placeholder="Chapter title"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block font-semibold text-zinc-200">
+                        Chapter time limit (minutes)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={chapter.timeLimitMinutes}
+                        onChange={(e) =>
+                          updateChapter(index, 'timeLimitMinutes', e.target.value)
+                        }
+                        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                        placeholder="Chapter time"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block font-semibold text-zinc-200">
+                        Chapter description
+                      </label>
+                      <input
+                        type="text"
+                        value={chapter.description}
+                        onChange={(e) =>
+                          updateChapter(index, 'description', e.target.value)
+                        }
+                        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                        placeholder="Chapter description"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
+          </section>
 
-            <div className="mt-3">
-              <label className="mb-1 block font-medium">Chapter description</label>
-              <input
-                type="text"
-                value={chapter.description}
-                onChange={(e) => updateChapter(index, 'description', e.target.value)}
-                className="w-90 rounded-xl border px-3 py-2"
-                placeholder="Chapter description"
-              />
+          <section className="border-t border-zinc-700 pt-8">
+            <h2 className="mb-4 text-lg font-semibold text-zinc-100">Optional hidden test</h2>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block font-semibold text-zinc-200">
+                  Hidden test name
+                </label>
+                <input
+                  type="text"
+                  name="testName"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="e.g. Edge case checks"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-zinc-200">
+                  Hidden test file name
+                </label>
+                <input
+                  type="text"
+                  name="testFileName"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="test.py"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="mb-1 block font-semibold text-zinc-200">
+                  Hidden test description
+                </label>
+                <input
+                  type="text"
+                  name="testDescription"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="What does this test verify?"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="mb-1 block font-semibold text-zinc-200">
+                  Hidden test file content
+                </label>
+                <textarea
+                  name="testContent"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="Paste the hidden test file contents here"
+                  rows={6}
+                />
+              </div>
             </div>
-
-            <div className="mt-3">
-              <label className="mb-1 block font-medium">Chapter time limit in minutes</label>
-              <input
-                type="number"
-                min={1}
-                value={chapter.timeLimitMinutes}
-                onChange={(e) => updateChapter(index, 'timeLimitMinutes', e.target.value)}
-                className="w-90 rounded-xl border px-3 py-2"
-                placeholder="Chapter time"
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-xl border p-4">
-        <h3 className="mb-3 text-lg font-semibold">Optional hidden test</h3>
-
-        <div>
-          <label className="mb-1 block font-medium">Test name</label>
-          <input
-            type="text"
-            name="testName"
-            className="w-90 rounded-xl border px-3 py-2"
-            placeholder="Test name"
-          />
+          </section>
         </div>
 
-        <div className="mt-3">
-          <label className="mb-1 block font-medium">Test description</label>
-          <input
-            type="text"
-            name="testDescription"
-            className="w-90 rounded-xl border px-3 py-2"
-            placeholder="Test description"
-          />
-        </div>
-
-        <div className="mt-3">
-          <label className="mb-1 block font-medium">Test file name</label>
-          <input
-            type="text"
-            name="testFileName"
-            className="w-90 rounded-xl border px-3 py-2"
-            placeholder="test.py"
-          />
-        </div>
-
-        <div className="mt-3">
-          <label className="mb-1 block font-medium">Test file content</label>
-          <textarea
-            name="testContent"
-            className="w-90 rounded-xl border px-3 py-2"
-            placeholder="Test file content"
-            rows={6}
-          />
-        </div>
-      </div>
-
-      <button type="submit" className="rounded-xl bg-blue-600 px-4 py-2 text-white">
-        Create assessment
-      </button>
-    </form>
+        <button
+          type="submit"
+          className="self-center text-zinc-950 font-semibold px-6 py-2 bg-teal-500 hover:bg-teal-400 rounded-xl"
+        >
+          Create assessment
+        </button>
+      </form>
+    </main>
   );
 }
