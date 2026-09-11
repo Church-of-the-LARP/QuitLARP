@@ -14,6 +14,7 @@ import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Users from "./pages/Users.tsx";
+import Create from "./pages/Create.tsx";
 import Layout from "./components/Layout.tsx";
 import { AuthProvider } from "./scripts/useAuth.tsx";
 import "./index.css";
@@ -33,6 +34,7 @@ createRoot(document.getElementById("root")!).render(
           <Route element={<SecuredRoute />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/create" element={<Create />} />
               <Route element={<SecuredRoute roles={["admin", "superadmin"]} />}>
                 <Route path="/users" element={<Users />} />
               </Route>
