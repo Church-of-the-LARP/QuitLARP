@@ -11,11 +11,13 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-form": "^1.33.5",
     "openapi-fetch": "^0.17.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.3",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

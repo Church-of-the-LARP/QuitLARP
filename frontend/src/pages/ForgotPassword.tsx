@@ -1,41 +1,50 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
+import { useForm } from '@tanstack/react-form';
+import { z } from 'zod';
 import Alert from '../components/Alert.tsx';
+import TextField from '../components/TextField.tsx';
 import { Link, useNavigate } from 'react-router-dom';
 import client, { getErrorText } from '../scripts/api.ts';
 
+const schema = z.object({
+  email: z.email('Enter a valid email'),
+});
+
 function App() {
   const navigate = useNavigate();
-  const [resetEmail, setResetEmail] = useState('');
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setAlertMsg(null);
-    try {
-      const res = await client.POST('/api/v1/auth/forgot-password', {
-        body: { email: resetEmail.trim() },
-      });
-      if (res.error) {
-        setAlertMsg(getErrorText(res.error, 'Could not send the reset link'));
-        return;
+  const form = useForm({
+    defaultValues: {
+      email: '',
+    },
+    validators: {
+      onChange: schema,
+    },
+    onSubmit: async ({ value }) => {
+      setAlertMsg(null);
+      try {
+        const res = await client.POST('/api/v1/auth/forgot-password', {
+          body: { email: value.email.trim() },
+        });
+        if (res.error) {
+          setAlertMsg(getErrorText(res.error, 'Could not send the reset link'));
+          return;
+        }
+
+        navigate('/login', {
+          state: {
+            notice:
+              res.data?.message ??
+              'If an account exists for that email, a reset link is on its way.',
+          },
+        });
+      } catch (err) {
+        console.error('Forgot password error:', err);
+        setAlertMsg('Could not send the reset link');
       }
-
-      navigate('/login', {
-        state: {
-          notice:
-            res.data?.message ??
-            'If an account exists for that email, a reset link is on its way.',
-        },
-      });
-    } catch (err) {
-      console.error('Forgot password error:', err);
-      setAlertMsg('Could not send the reset link');
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6">
@@ -54,28 +63,36 @@ function App() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-              Email
-            </span>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={resetEmail}
-              onChange={(e) => setResetEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 disabled:opacity-60"
-          >
-            {loading ? 'Sending…' : 'Send reset link'}
-          </button>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+          className="mt-6 space-y-4"
+        >
+          <form.Field name="email">
+            {(field) => (
+              <TextField
+                field={field}
+                label="Email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+              />
+            )}
+          </form.Field>
+          <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting]}>
+            {([canSubmit, isSubmitting]) => (
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="w-full rounded-md bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 disabled:opacity-60"
+              >
+                {isSubmitting ? 'Sending…' : 'Send reset link'}
+              </button>
+            )}
+          </form.Subscribe>
           <Link
             to="/login"
             className="block w-full text-center text-sm text-zinc-400 hover:text-zinc-100"

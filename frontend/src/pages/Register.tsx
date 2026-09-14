@@ -1,38 +1,53 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
+import { useForm } from '@tanstack/react-form';
+import { z } from 'zod';
 import Alert from '../components/Alert.tsx';
+import TextField from '../components/TextField.tsx';
 import { Link } from 'react-router-dom';
 import useAuth from '../scripts/useAuth.tsx';
 import { apiUrl } from '../scripts/api.ts';
 import type { ActionResult } from '../types/types.ts';
 
+const schema = z.object({
+  username: z
+    .string()
+    .min(3, 'At least 3 characters')
+    .max(32, 'At most 32 characters')
+    .regex(/^[A-Za-z0-9_-]+$/, 'Letters, numbers, - and _ only'),
+  email: z.email('Enter a valid email'),
+  password: z.string().min(8, 'At least 8 characters'),
+});
+
 function App() {
   const googleUrl = `${apiUrl}/api/v1/auth/google`;
   const { registerUser } = useAuth();
-  const [registerName, setRegisterName] = useState('');
-  const [registerEmail, setRegisterEmail] = useState('');
-  const [registerPass, setRegisterPass] = useState('');
   const [alertMsg, setAlertMsg] = useState<ActionResult>({});
-  const [loading, setLoading] = useState(false);
 
-  const handleRegister = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setAlertMsg({});
-    try {
-      setAlertMsg(
-        await registerUser(
-          registerName.trim(),
-          registerEmail.trim(),
-          registerPass,
-        ),
-      );
-    } catch (err) {
-      console.error('Register error:', err);
-      setAlertMsg({ error: 'Something went wrong while creating the account' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const form = useForm({
+    defaultValues: {
+      username: '',
+      email: '',
+      password: '',
+    },
+    validators: {
+      onChange: schema,
+    },
+    onSubmit: async ({ value }) => {
+      setAlertMsg({});
+      try {
+        setAlertMsg(
+          await registerUser(
+            value.username.trim(),
+            value.email.trim(),
+            value.password,
+          ),
+        );
+      } catch (err) {
+        console.error('Register error:', err);
+        setAlertMsg({ error: 'Something went wrong while creating the account' });
+      }
+    },
+  });
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6">
@@ -57,58 +72,57 @@ function App() {
             </div>
           )}
 
-          <form onSubmit={handleRegister} className="mt-6 space-y-4">
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-                Username
-              </span>
-              <input
-                required
-                minLength={3}
-                maxLength={32}
-                pattern="[A-Za-z0-9_-]+"
-                autoComplete="username"
-                value={registerName}
-                onChange={(e) => setRegisterName(e.target.value)}
-                placeholder="jane_doe"
-                className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-                Email
-              </span>
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={registerEmail}
-                onChange={(e) => setRegisterEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-                Password
-              </span>
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={registerPass}
-                onChange={(e) => setRegisterPass(e.target.value)}
-                className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
-              />
-            </label>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit();
+            }}
+            className="mt-6 space-y-4"
+          >
+            <form.Field name="username">
+              {(field) => (
+                <TextField
+                  field={field}
+                  label="Username"
+                  autoComplete="username"
+                  placeholder="jane_doe"
+                />
+              )}
+            </form.Field>
+            <form.Field name="email">
+              {(field) => (
+                <TextField
+                  field={field}
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                />
+              )}
+            </form.Field>
+            <form.Field name="password">
+              {(field) => (
+                <TextField
+                  field={field}
+                  label="Password"
+                  type="password"
+                  autoComplete="current-password"
+                />
+              )}
+            </form.Field>
             <p className="text-xs text-zinc-500">At least 8 characters.</p>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 disabled:opacity-60"
-            >
-              {loading ? 'Creating account…' : 'Register'}
-            </button>
+            <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting]}>
+              {([canSubmit, isSubmitting]) => (
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className="w-full rounded-md bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 disabled:opacity-60"
+                >
+                  {isSubmitting ? 'Creating account…' : 'Register'}
+                </button>
+              )}
+            </form.Subscribe>
           </form>
 
           <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">

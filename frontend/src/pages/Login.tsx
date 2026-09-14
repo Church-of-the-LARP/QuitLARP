@@ -1,18 +1,23 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
+import { useForm } from '@tanstack/react-form';
+import { z } from 'zod';
 import Alert from '../components/Alert.tsx';
+import TextField from '../components/TextField.tsx';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import useAuth from '../scripts/useAuth.tsx';
 import { apiUrl } from '../scripts/api.ts';
 import type { ActionResult } from '../types/types.ts';
+
+const schema = z.object({
+  email: z.email('Enter a valid email'),
+  password: z.string().min(1, 'Password is required'),
+});
 
 function App() {
   const googleUrl = `${apiUrl}/api/v1/auth/google`;
   const { loginUser } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPass, setLoginPass] = useState('');
-  const [loading, setLoading] = useState(false);
   const [alertMsg, setAlertMsg] = useState<ActionResult>(() => {
     const state = location.state as { notice?: string } | null;
     return state?.notice ? { notice: state.notice } : {};
@@ -28,19 +33,24 @@ function App() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const handleLogin = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setAlertMsg({});
-    try {
-      setAlertMsg(await loginUser(loginEmail, loginPass));
-    } catch (err) {
-      console.error('Login error:', err);
-      setAlertMsg({ error: 'Something went wrong while signing in' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const form = useForm({
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+    validators: {
+      onChange: schema,
+    },
+    onSubmit: async ({ value }) => {
+      setAlertMsg({});
+      try {
+        setAlertMsg(await loginUser(value.email, value.password));
+      } catch (err) {
+        console.error('Login error:', err);
+        setAlertMsg({ error: 'Something went wrong while signing in' });
+      }
+    },
+  });
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6">
@@ -68,41 +78,46 @@ function App() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="mt-6 space-y-4">
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-                Email
-              </span>
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-                Password
-              </span>
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={loginPass}
-                onChange={(e) => setLoginPass(e.target.value)}
-                className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 disabled:opacity-60"
-            >
-              {loading ? 'Signing in…' : 'Sign in'}
-            </button>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit();
+            }}
+            className="mt-6 space-y-4"
+          >
+            <form.Field name="email">
+              {(field) => (
+                <TextField
+                  field={field}
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                />
+              )}
+            </form.Field>
+            <form.Field name="password">
+              {(field) => (
+                <TextField
+                  field={field}
+                  label="Password"
+                  type="password"
+                  autoComplete="current-password"
+                />
+              )}
+            </form.Field>
+            <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting]}>
+              {([canSubmit, isSubmitting]) => (
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className="w-full rounded-md bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 disabled:opacity-60"
+                >
+                  {isSubmitting ? 'Signing in…' : 'Sign in'}
+                </button>
+              )}
+            </form.Subscribe>
           </form>
 
           <div className="mt-3 text-right">
