@@ -131,10 +131,6 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// devMail is the mock delivery note appended to every "email": the message
-// itself already lands in the backend log.
-const devMail = "\n(dev: this is a mock email — it was printed to the backend log, not sent. Run `docker compose logs backend` to read it.)"
-
 // sendVerificationEmail issues a signed link and hands it to the mailer.
 func (h *Handlers) sendVerificationEmail(ctx context.Context, u models.User) error {
 	if u.EmailVerified {
@@ -148,7 +144,7 @@ func (h *Handlers) sendVerificationEmail(ctx context.Context, u models.User) err
 	return h.mail.Send(ctx, mailer.Message{
 		To:      u.Email,
 		Subject: "Verify your email address",
-		Text:    "Hi " + u.Username + ",\n\nPlease confirm your email address by opening this link:\n\n" + link + "\n\nThe link is valid for " + h.cfg.ActionTokenTTL.String() + ". If you did not create an account, you can ignore this email." + devMail,
+		Text:    "Hi " + u.Username + ",\n\nPlease confirm your email address by opening this link:\n\n" + link + "\n\nThe link is valid for " + h.cfg.ActionTokenTTL.String() + ". If you did not create an account, you can ignore this email.",
 	})
 }
 
@@ -162,6 +158,6 @@ func (h *Handlers) sendResetEmail(ctx context.Context, u models.User) error {
 	return h.mail.Send(ctx, mailer.Message{
 		To:      u.Email,
 		Subject: "Reset your password",
-		Text:    "Hi " + u.Username + ",\n\nSomeone asked to reset your password. Open this link to choose a new one:\n\n" + link + "\n\nThe link is valid for " + h.cfg.ActionTokenTTL.String() + ". If this was not you, you can ignore this email." + devMail,
+		Text:    "Hi " + u.Username + ",\n\nSomeone asked to reset your password. Open this link to choose a new one:\n\n" + link + "\n\nThe link is valid for " + h.cfg.ActionTokenTTL.String() + ". If this was not you, you can ignore this email.",
 	})
 }
