@@ -13,14 +13,34 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  # Development email catcher: the backend delivers over SMTP to
+  # mailpit:1025 and every message shows up in the web UI instead of being
+  # sent anywhere. Unused when EMAIL_PROVIDER=resend.
+  mailpit:
+    image: axllent/mailpit:v1.31.1
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025" # web UI
+      - "1025:1025"                     # SMTP (for a backend run on the host)
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8025/livez"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   backend:
     build: ./backend
     environment:
       DATABASE_URL: postgres://app:app@db:5432/app?sslmode=disable
+      # The email transport is selected by ENV/EMAIL_PROVIDER in
+      # backend/.env; only the in-network Mailpit address is pinned here.
+      MAILPIT_SMTP_ADDR: mailpit:1025
+      MAILPIT_UI_URL: http://localhost:${MAILPIT_UI_PORT:-8025}
     ports:
       - "8888:8888"
     depends_on:
       db:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8888/openapi.json"]

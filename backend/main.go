@@ -42,7 +42,13 @@ func main() {
 	if !google.Enabled() {
 		log.Printf("INFO: Google OAuth disabled (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET not set) — /api/v1/auth/google returns 501")
 	}
-	hs := handlers.New(db, cfg, mailer.NewMock(cfg.EmailFrom), tokens, google)
+
+	mail, err := mailer.New(cfg.Email)
+	if err != nil {
+		log.Fatalf("mailer: %v", err)
+	}
+	log.Printf("email: provider=%s from=%s", cfg.Email.Provider, cfg.Email.From)
+	hs := handlers.New(db, cfg, mail, tokens, google)
 
 	// The typed, OpenAPI-documented API lives on its own mux...
 	apiMux := http.NewServeMux()
