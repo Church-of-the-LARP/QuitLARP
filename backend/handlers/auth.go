@@ -50,7 +50,7 @@ func (h *Handlers) registerAuth(api huma.API) {
 		Method:      http.MethodPost,
 		Path:        "/api/v1/auth/register",
 		Summary:     "Create an account with email + password",
-		Description: "Signs the user in immediately and sends a mock verification email (printed to the backend log).",
+		Description: "Signs the user in immediately and sends a verification link by email.",
 	}, func(ctx context.Context, input *RegisterInput) (*UserOutput, error) {
 		username := strings.TrimSpace(input.Body.Username)
 		email := strings.ToLower(strings.TrimSpace(input.Body.Email))

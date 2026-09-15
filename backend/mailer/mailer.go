@@ -1,13 +1,15 @@
-// Package mailer sends outbound application emails. It only contains a mock
-// implementation: every message is written to the backend log so flows such
-// as email verification and password reset can be exercised end-to-end
-// without a real email provider.
+// Package mailer sends outbound application emails. The transport is chosen
+// centrally from configuration (see config.EmailConfig): development captures
+// every message with a local Mailpit server, production delivers through
+// Resend. Endpoints only ever see the Mailer interface, so they never need
+// to know which transport is active.
 package mailer
 
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"backend/config"
 )
 
 // Message is a single outgoing email.
@@ -22,30 +24,19 @@ type Mailer interface {
 	Send(ctx context.Context, msg Message) error
 }
 
-// Mock is a Mailer that prints messages to the console. Replace it with a
-// real SMTP/provider-backed implementation later without touching callers.
-type Mock struct {
-	From string
-}
-
-// NewMock creates a console Mailer.
-func NewMock(from string) *Mock {
-	return &Mock{From: from}
-}
-
-// Send logs the message. The full "email" is visible with:
-//
-//	docker compose logs backend
-func (m *Mock) Send(_ context.Context, msg Message) error {
-	body := fmt.Sprintf(`
---------------------------------- MOCK EMAIL ---------------------------------
-From:    %s
-To:      %s
-Subject: %s
-
-%s
---------------------------------- END EMAIL ---------------------------------
-`, m.From, msg.To, msg.Subject, msg.Text)
-	log.Print(body)
-	return nil
+// New builds the Mailer selected by cfg.Provider. It fails fast on unknown
+// providers and on a Resend configuration without an API key, so a
+// misconfigured service refuses to start instead of dropping mail later.
+func New(cfg config.EmailConfig) (Mailer, error) {
+	switch cfg.Provider {
+	case config.EmailProviderMailpit:
+		return NewMailpit(cfg.From, cfg.MailpitSMTPAddr, cfg.MailpitUIURL), nil
+	case config.EmailProviderResend:
+		if cfg.ResendAPIKey == "" {
+			return nil, fmt.Errorf("EMAIL_PROVIDER=%s requires RESEND_API_KEY (see backend/.env.example)", config.EmailProviderResend)
+		}
+		return NewResend(cfg.From, cfg.ResendAPIKey), nil
+	default:
+		return nil, fmt.Errorf("unknown EMAIL_PROVIDER %q (expected %q or %q)", cfg.Provider, config.EmailProviderMailpit, config.EmailProviderResend)
+	}
 }
