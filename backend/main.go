@@ -15,7 +15,14 @@ import (
 	"backend/handlers"
 	"backend/mailer"
 	"backend/middleware"
+	"backend/supervisor"
 )
+
+var containerSupervisor *supervisor.Supervisor
+
+func init() {
+	containerSupervisor.Init()
+}
 
 func main() {
 	cfg, err := config.Load()
