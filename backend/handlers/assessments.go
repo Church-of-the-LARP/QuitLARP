@@ -19,6 +19,10 @@ func unprocessable(msg string) error {
 	return huma.NewError(http.StatusUnprocessableEntity, msg)
 }
 
+func conflict(msg string) error {
+	return huma.NewError(http.StatusConflict, msg)
+}
+
 // normalizeDraft validates an assessment payload and returns a cleaned copy:
 // whitespace is trimmed, unknown tags are fine (they are created on the fly)
 // and duplicate/blank tag names are dropped.
@@ -42,6 +46,9 @@ func normalizeDraft(in models.AssessmentDraft) (models.AssessmentDraft, error) {
 	}
 	if d.Template.FileName == "" {
 		return d, unprocessable("template.fileName is required")
+	}
+	if len(d.Chapters) == 0 {
+		return d, unprocessable("at least one chapter is required")
 	}
 
 	seen := map[string]bool{}
@@ -85,24 +92,26 @@ func normalizeDraft(in models.AssessmentDraft) (models.AssessmentDraft, error) {
 
 // requireManageableAssessment checks the caller is allowed to write to the
 // assessment: its author, or an admin/superadmin. The assessment must exist.
-func (h *Handlers) requireManageableAssessment(ctx context.Context, id int64) error {
+// It returns the resolved caller so callers that also need the user don't
+// have to look it up again.
+func (h *Handlers) requireManageableAssessment(ctx context.Context, id int64) (models.User, error) {
 	authorID, err := database.GetAssessmentAuthorID(ctx, h.db, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			return huma.NewError(http.StatusNotFound, "assessment not found")
+			return models.User{}, huma.NewError(http.StatusNotFound, "assessment not found")
 		}
 		log.Printf("assessment author lookup: %v", err)
-		return huma.NewError(http.StatusInternalServerError, "something went wrong")
+		return models.User{}, huma.NewError(http.StatusInternalServerError, "something went wrong")
 	}
 	u, err := h.requireUser(ctx)
 	if err != nil {
-		return err
+		return models.User{}, err
 	}
 	if (authorID != nil && *authorID == u.ID) ||
 		u.Role == models.RoleAdmin || u.Role == models.RoleSuperadmin {
-		return nil
+		return u, nil
 	}
-	return huma.NewError(http.StatusForbidden, "you do not have permission to do this")
+	return models.User{}, huma.NewError(http.StatusForbidden, "you do not have permission to do this")
 }
 
 // ---- response/request types ----------------------------------------------
@@ -273,7 +282,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Summary:     "Update an assessment",
 		Description: "The author of the assessment or an admin/superadmin may update its scalar fields and template. Chapters, tests and tags have their own endpoints.",
 	}, func(ctx context.Context, input *PatchAssessmentInput) (*AssessmentOutput, error) {
-		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err
 		}
 		patch := database.AssessmentPatch{}
@@ -333,7 +342,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 	}, func(ctx context.Context, input *struct {
 		ID int64 `path:"id" example:"1" doc:"Assessment id to delete"`
 	}) (*struct{}, error) {
-		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err
 		}
 		if err := database.DeleteAssessment(ctx, h.db, input.ID); err != nil {
@@ -351,7 +360,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Summary:     "Replace the tags of an assessment",
 		Description: "The author of the assessment or an admin/superadmin may set its full tag list. Unknown tag names are created automatically.",
 	}, func(ctx context.Context, input *ReplaceAssessmentTagsInput) (*AssessmentOutput, error) {
-		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err
 		}
 		if err := database.ReplaceAssessmentTags(ctx, h.db, input.ID, input.Body.Tags); err != nil {

@@ -55,7 +55,7 @@ func (h *Handlers) registerAssessmentChapters(api huma.API) {
 		Summary:     "Add a chapter to an assessment",
 		Description: "The author of the assessment or an admin/superadmin may append a chapter; it is placed after the current last one.",
 	}, func(ctx context.Context, input *AddChapterInput) (*ChapterOutput, error) {
-		if err := h.requireManageableAssessment(ctx, input.AssessmentID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, input.AssessmentID); err != nil {
 			return nil, err
 		}
 		draft := models.ChapterDraft{
@@ -99,7 +99,7 @@ func (h *Handlers) registerAssessmentChapters(api huma.API) {
 			log.Printf("chapter lookup: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not update chapter")
 		}
-		if err := h.requireManageableAssessment(ctx, ch.AssessmentID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, ch.AssessmentID); err != nil {
 			return nil, err
 		}
 
@@ -160,10 +160,13 @@ func (h *Handlers) registerAssessmentChapters(api huma.API) {
 			log.Printf("chapter lookup: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not delete chapter")
 		}
-		if err := h.requireManageableAssessment(ctx, ch.AssessmentID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, ch.AssessmentID); err != nil {
 			return nil, err
 		}
 		if err := database.DeleteChapter(ctx, h.db, input.ChapterID); err != nil {
+			if errors.Is(err, database.ErrLastChapter) {
+				return nil, unprocessable("cannot delete an assessment's only chapter")
+			}
 			log.Printf("delete chapter: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not delete chapter")
 		}

@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -362,4 +364,139 @@ func DeleteAssessment(ctx context.Context, db *sqlx.DB, id int64) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// inviteColumns is the SELECT list for a full invite row.
+const inviteColumns = `id, assessment_id, host_id, invite_code, scheduled_start_at,
+	time_limit_minutes, max_uses, uses_count, created_at`
+
+// GetInvite loads one invite by id, e.g. so a Runner can anchor a scheduled
+// attempt's clock to its scheduledStartAt.
+func GetInvite(ctx context.Context, db *sqlx.DB, id int64) (models.Invite, error) {
+	var invite models.Invite
+	err := db.GetContext(ctx, &invite, "SELECT "+inviteColumns+" FROM assessment_invites WHERE id = $1", id)
+	if err != nil {
+		return models.Invite{}, mapNotFound(err)
+	}
+	return invite, nil
+}
+
+func CreateInvite(ctx context.Context, db *sqlx.DB, assessmentID, hostID int64,
+	scheduledStartAt time.Time, timeLimitMinutes, maxUses *int) (models.Invite, error) {
+	for range 5 {
+		codeBytes := make([]byte, 6)
+		if _, err := rand.Read(codeBytes); err != nil {
+			return models.Invite{}, err
+		}
+
+		var invite models.Invite
+		err := db.GetContext(ctx, &invite, `
+			INSERT INTO assessment_invites
+				(assessment_id, host_id, invite_code, scheduled_start_at, time_limit_minutes, max_uses)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			RETURNING id, assessment_id, host_id, invite_code, scheduled_start_at,
+			          time_limit_minutes, max_uses, uses_count, created_at`,
+			assessmentID, hostID, hex.EncodeToString(codeBytes), scheduledStartAt,
+			timeLimitMinutes, maxUses)
+		if err == nil {
+			return invite, nil
+		}
+		if !IsUniqueViolation(err) {
+			return models.Invite{}, err
+		}
+	}
+	return models.Invite{}, fmt.Errorf("could not generate a unique invite code")
+}
+
+type inviteWithAssessmentLimit struct {
+	models.Invite
+	AssessmentTimeLimit int `db:"assessment_time_limit"`
+}
+
+func acceptInvite(ctx context.Context, db *sqlx.DB, code string, userID int64) (models.Invite, models.Attempt, error) {
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return models.Invite{}, models.Attempt{}, err
+	}
+	defer tx.Rollback()
+
+	var row inviteWithAssessmentLimit
+	err = tx.GetContext(ctx, &row, `
+		SELECT ai.id, ai.assessment_id, ai.host_id, ai.invite_code,
+		       ai.scheduled_start_at, ai.time_limit_minutes, ai.max_uses,
+		       ai.uses_count, ai.created_at,
+		       a.time_limit_minutes AS assessment_time_limit
+		FROM assessment_invites ai
+		JOIN assessments a ON a.id = ai.assessment_id
+		WHERE ai.invite_code = $1
+		FOR UPDATE`, code)
+	if err != nil {
+		return models.Invite{}, models.Attempt{}, mapNotFound(err)
+	}
+
+	var attempt models.Attempt
+	err = tx.GetContext(ctx, &attempt, `
+		SELECT id, assessment_id, invite_id, user_id, status, time_limit_minutes,
+		       current_chapter_id, started_at, ended_at
+		FROM assessment_attempts
+		WHERE invite_id = $1 AND user_id = $2 AND status != 'ended'`,
+		row.ID, userID)
+	if err == nil {
+		if err := tx.Commit(); err != nil {
+			return models.Invite{}, models.Attempt{}, err
+		}
+		return row.Invite, attempt, nil
+	}
+	if !IsNotFound(err) {
+		return models.Invite{}, models.Attempt{}, err
+	}
+
+	// uses_count tracks distinct acceptors, not attempt rows: a user who
+	// left and is now re-accepting already holds a (now-ended) attempt row
+	// and must not be charged against max_uses a second time.
+	var alreadyAccepted bool
+	if err := tx.GetContext(ctx, &alreadyAccepted, `
+		SELECT EXISTS(SELECT 1 FROM assessment_attempts WHERE invite_id = $1 AND user_id = $2)`,
+		row.ID, userID); err != nil {
+		return models.Invite{}, models.Attempt{}, err
+	}
+
+	timeLimit := row.AssessmentTimeLimit
+	if row.TimeLimitMinutes != nil {
+		timeLimit = *row.TimeLimitMinutes
+	}
+	if !time.Now().Before(row.ScheduledStartAt.Add(time.Duration(timeLimit) * time.Minute)) {
+		return models.Invite{}, models.Attempt{}, ErrInviteExpired
+	}
+	if !alreadyAccepted && row.MaxUses != nil && row.UsesCount >= *row.MaxUses {
+		return models.Invite{}, models.Attempt{}, ErrInviteMaxUses
+	}
+
+	err = tx.GetContext(ctx, &attempt, `
+		INSERT INTO assessment_attempts
+			(assessment_id, invite_id, user_id, status, time_limit_minutes)
+		VALUES ($1, $2, $3, 'pending', $4)
+		RETURNING id, assessment_id, invite_id, user_id, status, time_limit_minutes,
+		          current_chapter_id, started_at, ended_at`,
+		row.AssessmentID, row.ID, userID, timeLimit)
+	if err != nil {
+		return models.Invite{}, models.Attempt{}, err
+	}
+	if !alreadyAccepted {
+		if _, err := tx.ExecContext(ctx,
+			"UPDATE assessment_invites SET uses_count = uses_count + 1 WHERE id = $1", row.ID); err != nil {
+			return models.Invite{}, models.Attempt{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return models.Invite{}, models.Attempt{}, err
+	}
+	return row.Invite, attempt, nil
+}
+
+// AcceptInvite returns the current user's active attempt for an invite,
+// creating a pending attempt and consuming one distinct use when necessary.
+func AcceptInvite(ctx context.Context, db *sqlx.DB, code string, userID int64) (models.Attempt, error) {
+	_, attempt, err := acceptInvite(ctx, db, code, userID)
+	return attempt, err
 }

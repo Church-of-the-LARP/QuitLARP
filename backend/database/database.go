@@ -3,6 +3,7 @@
 package database
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -15,6 +16,13 @@ import (
 
 // ErrNotFound is returned when a lookup matched no rows.
 var ErrNotFound = errors.New("not found")
+
+var ErrInviteExpired = errors.New("invite expired")
+var ErrInviteMaxUses = errors.New("invite reached its maximum uses")
+
+// ErrLastChapter is returned when deleting a chapter would leave its
+// assessment with none.
+var ErrLastChapter = errors.New("cannot delete the only chapter of an assessment")
 
 // Connect dials the database, retrying while the container orchestration
 // brings postgres up.
@@ -45,4 +53,10 @@ func IsUniqueViolation(err error) bool {
 func IsForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23503"
+}
+
+// IsNotFound reports whether err represents "no rows", whether or not it
+// has already been mapped to the package-level ErrNotFound.
+func IsNotFound(err error) bool {
+	return errors.Is(err, sql.ErrNoRows) || errors.Is(err, ErrNotFound)
 }

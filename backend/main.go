@@ -15,6 +15,7 @@ import (
 	"backend/handlers"
 	"backend/mailer"
 	"backend/middleware"
+	"backend/runtime"
 )
 
 func main() {
@@ -42,18 +43,22 @@ func main() {
 	if !google.Enabled() {
 		log.Printf("INFO: Google OAuth disabled (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET not set) — /api/v1/auth/google returns 501")
 	}
-	hs := handlers.New(db, cfg, mailer.NewMock(cfg.EmailFrom), tokens, google)
+	attempts := runtime.NewAttemptManager(context.Background(), db)
+	hs := handlers.New(db, cfg, mailer.NewMock(cfg.EmailFrom), tokens, google, attempts)
 
 	// The typed, OpenAPI-documented API lives on its own mux...
 	apiMux := http.NewServeMux()
 	api := humago.New(apiMux, huma.DefaultConfig("QuitLARP API", "0.1.0"))
 	hs.Register(api)
 
-	// ...while the browser-redirect OAuth endpoints are plain http handlers
-	// registered directly on the root mux (longer path prefix wins).
+	// ...while the browser-redirect OAuth endpoints and the attempt
+	// WebSocket are plain http handlers registered directly on the root
+	// mux (longer path prefix wins) — the WS upgrade stops being HTTP, so
+	// it can't be a huma operation.
 	root := http.NewServeMux()
 	root.HandleFunc("GET /api/v1/auth/google", hs.GoogleAuthStart)
 	root.HandleFunc("GET /api/v1/auth/google/callback", hs.GoogleAuthCallback)
+	root.Handle("GET /api/v1/attempts/{id}/ws", middleware.Authenticate(tokens, http.HandlerFunc(hs.AttemptWebSocket)))
 	// CookieJar buffers huma responses so session cookies can be attached;
 	// Authenticate parses the session token (cookie or Bearer) per request.
 	root.Handle("/", middleware.CookieJar(middleware.Authenticate(tokens, apiMux)))

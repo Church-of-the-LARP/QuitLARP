@@ -53,7 +53,7 @@ func (h *Handlers) registerAssessmentTests(api huma.API) {
 		Summary:     "Add a hidden test to an assessment",
 		Description: "The author of the assessment or an admin/superadmin may add a hidden test with its testing file. Candidates only ever see the name and description.",
 	}, func(ctx context.Context, input *AddTestInput) (*TestOutput, error) {
-		if err := h.requireManageableAssessment(ctx, input.AssessmentID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, input.AssessmentID); err != nil {
 			return nil, err
 		}
 		draft := models.TestDraft{
@@ -101,7 +101,7 @@ func (h *Handlers) registerAssessmentTests(api huma.API) {
 			log.Printf("test lookup: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not load test")
 		}
-		if err := h.requireManageableAssessment(ctx, t.AssessmentID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, t.AssessmentID); err != nil {
 			return nil, err
 		}
 		resp := &TestOutput{}
@@ -125,7 +125,7 @@ func (h *Handlers) registerAssessmentTests(api huma.API) {
 			log.Printf("test lookup: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not update test")
 		}
-		if err := h.requireManageableAssessment(ctx, t.AssessmentID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, t.AssessmentID); err != nil {
 			return nil, err
 		}
 
@@ -180,7 +180,7 @@ func (h *Handlers) registerAssessmentTests(api huma.API) {
 			log.Printf("test lookup: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not delete test")
 		}
-		if err := h.requireManageableAssessment(ctx, t.AssessmentID); err != nil {
+		if _, err := h.requireManageableAssessment(ctx, t.AssessmentID); err != nil {
 			return nil, err
 		}
 		if err := database.DeleteTest(ctx, h.db, input.TestID); err != nil {

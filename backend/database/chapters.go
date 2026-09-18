@@ -24,6 +24,15 @@ func GetChapter(ctx context.Context, db *sqlx.DB, id int64) (models.Chapter, err
 	return ch, nil
 }
 
+// ListChapters loads every chapter of an assessment, ordered the same way
+// the runtime Runner walks them: (position, id).
+func ListChapters(ctx context.Context, db *sqlx.DB, assessmentID int64) ([]models.Chapter, error) {
+	chapters := []models.Chapter{}
+	err := db.SelectContext(ctx, &chapters,
+		"SELECT "+chapterColumns+" FROM chapters WHERE assessment_id = $1 ORDER BY position, id", assessmentID)
+	return chapters, err
+}
+
 // AddChapter appends a chapter to an assessment at the next free position
 // (the position of the last chapter plus one).
 func AddChapter(ctx context.Context, db *sqlx.DB, assessmentID int64, draft models.ChapterDraft) (models.Chapter, error) {
@@ -86,14 +95,25 @@ func UpdateChapter(ctx context.Context, db *sqlx.DB, id int64, patch ChapterPatc
 	return GetChapter(ctx, db, id)
 }
 
-// DeleteChapter removes one chapter.
+// DeleteChapter removes one chapter, refusing to remove an assessment's
+// last remaining chapter so a runner can never be left without one to run.
 func DeleteChapter(ctx context.Context, db *sqlx.DB, id int64) error {
-	res, err := db.ExecContext(ctx, "DELETE FROM chapters WHERE id = $1", id)
+	res, err := db.ExecContext(ctx, `
+		DELETE FROM chapters c
+		WHERE c.id = $1
+		  AND (SELECT COUNT(*) FROM chapters WHERE assessment_id = c.assessment_id) > 1`, id)
 	if err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
+	if n, _ := res.RowsAffected(); n > 0 {
+		return nil
 	}
-	return nil
+	var exists bool
+	if err := db.GetContext(ctx, &exists, "SELECT EXISTS(SELECT 1 FROM chapters WHERE id = $1)", id); err != nil {
+		return err
+	}
+	if exists {
+		return ErrLastChapter
+	}
+	return ErrNotFound
 }

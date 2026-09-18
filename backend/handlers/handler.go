@@ -21,21 +21,23 @@ import (
 	"backend/mailer"
 	"backend/middleware"
 	"backend/models"
+	"backend/runtime"
 )
 
 // Handlers carries the shared dependencies for every endpoint.
 type Handlers struct {
-	db     *sqlx.DB
-	cfg    *config.Config
-	mail   mailer.Mailer
-	tokens *auth.Auth
-	google *auth.GoogleClient
+	db       *sqlx.DB
+	cfg      *config.Config
+	mail     mailer.Mailer
+	tokens   *auth.Auth
+	google   *auth.GoogleClient
+	attempts *runtime.AttemptManager
 }
 
 // New builds the handler bundle.
 func New(db *sqlx.DB, cfg *config.Config, mail mailer.Mailer,
-	tokens *auth.Auth, google *auth.GoogleClient) *Handlers {
-	return &Handlers{db: db, cfg: cfg, mail: mail, tokens: tokens, google: google}
+	tokens *auth.Auth, google *auth.GoogleClient, attempts *runtime.AttemptManager) *Handlers {
+	return &Handlers{db: db, cfg: cfg, mail: mail, tokens: tokens, google: google, attempts: attempts}
 }
 
 // Register mounts every huma operation on the API.
@@ -47,6 +49,8 @@ func (h *Handlers) Register(api huma.API) {
 	h.registerAssessments(api)
 	h.registerAssessmentChapters(api)
 	h.registerAssessmentTests(api)
+	h.registerAssessmentInvites(api)
+	h.registerAssessmentAttempts(api)
 	h.registerTags(api)
 }
 
