@@ -42,6 +42,18 @@ func GetUserWithPassword(ctx context.Context, db *sqlx.DB, email string) (models
 	return row, nil
 }
 
+// GetUserWithPasswordByUsername loads a user plus password hash by username
+// (the username half of HTTP Basic auth, e.g. for the local git server).
+func GetUserWithPasswordByUsername(ctx context.Context, db *sqlx.DB, username string) (models.UserWithPassword, error) {
+	var row models.UserWithPassword
+	err := db.GetContext(ctx, &row,
+		"SELECT "+models.UserColumns+", password_hash FROM users WHERE LOWER(username) = LOWER($1)", username)
+	if err != nil {
+		return models.UserWithPassword{}, mapNotFound(err)
+	}
+	return row, nil
+}
+
 // GetUserByUsername loads a user by case-insensitive username.
 func GetUserByUsername(ctx context.Context, db *sqlx.DB, username string) (models.User, error) {
 	var u models.User

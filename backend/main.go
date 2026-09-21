@@ -54,6 +54,9 @@ func main() {
 	root := http.NewServeMux()
 	root.HandleFunc("GET /api/v1/auth/google", hs.GoogleAuthStart)
 	root.HandleFunc("GET /api/v1/auth/google/callback", hs.GoogleAuthCallback)
+	// The local git server (clone/fetch/push over smart HTTP) is raw too: it
+	// streams a binary protocol and accepts its own Basic-auth credentials.
+	root.Handle("/git/", hs.GitHandler())
 	// CookieJar buffers huma responses so session cookies can be attached;
 	// Authenticate parses the session token (cookie or Bearer) per request.
 	root.Handle("/", middleware.CookieJar(middleware.Authenticate(tokens, apiMux)))

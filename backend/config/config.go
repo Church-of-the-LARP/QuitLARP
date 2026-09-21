@@ -33,6 +33,7 @@ type Config struct {
 	PublicBaseURL  string // externally reachable base URL of this backend
 	FrontendURL    string // where the SPA is served (redirects, email links)
 	EmailFrom      string
+	GitReposDir    string // where the local git server keeps its bare repositories
 	Google         GoogleConfig
 	Superadmin     SuperadminConfig
 }
@@ -96,6 +97,7 @@ func Load() (*Config, error) {
 	cfg.PublicBaseURL = strings.TrimRight(get("PUBLIC_BASE_URL", "http://localhost:8888"), "/")
 	cfg.FrontendURL = strings.TrimRight(get("FRONTEND_URL", "http://localhost:5173"), "/")
 	cfg.EmailFrom = get("EMAIL_FROM", "QuitLARP <no-reply@example.com>")
+	cfg.GitReposDir = get("GIT_REPOS_DIR", "data/git")
 
 	cfg.Google = GoogleConfig{
 		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
