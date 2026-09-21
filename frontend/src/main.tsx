@@ -1,10 +1,49 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import GuestRoute from "./components/GuestRoute.tsx";
+import SecuredRoute from "./components/SecuredRoute.tsx";
+import Login from "./pages/Login.tsx";
+import Register from "./pages/Register.tsx";
+import ForgotPassword from "./pages/ForgotPassword.tsx";
+import ResetPassword from "./pages/ResetPassword.tsx";
+import Dashboard from "./pages/Dashboard.tsx";
+import Users from "./pages/Users.tsx";
+import Create from "./pages/Create.tsx";
+import Layout from "./components/Layout.tsx";
+import { AuthProvider } from "./scripts/useAuth.tsx";
+import "./index.css";
 
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <Router>
+      <AuthProvider>
+        <Routes>
+          <Route element={<GuestRoute />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+          </Route>
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          <Route element={<SecuredRoute />}>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/create" element={<Create />} />
+              <Route element={<SecuredRoute roles={["admin", "superadmin"]} />}>
+                <Route path="/users" element={<Users />} />
+              </Route>
+            </Route>
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
   </StrictMode>,
-)
+);

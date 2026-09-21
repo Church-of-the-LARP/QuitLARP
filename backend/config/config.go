@@ -18,6 +18,11 @@ import (
 const (
 	defaultJWTSecret     = "dev-only-insecure-jwt-secret-change-me"
 	defaultSuperPassword = "superadmin-dev-password-change-me"
+
+	// EmailProviderMailpit captures mail on a local Mailpit server (dev).
+	EmailProviderMailpit = "mailpit"
+	// EmailProviderResend delivers mail through the Resend API (prod).
+	EmailProviderResend = "resend"
 )
 
 // Config holds every runtime setting for the backend.
@@ -32,7 +37,7 @@ type Config struct {
 	JWTSecret      string
 	PublicBaseURL  string // externally reachable base URL of this backend
 	FrontendURL    string // where the SPA is served (redirects, email links)
-	EmailFrom      string
+	Email          EmailConfig
 	GitReposDir    string // where the local git server keeps its bare repositories
 	Google         GoogleConfig
 	Superadmin     SuperadminConfig
@@ -50,6 +55,25 @@ type GoogleConfig struct {
 // of crashing, so the app runs fine without Google credentials.
 func (g GoogleConfig) Enabled() bool {
 	return g.ClientID != "" && g.ClientSecret != "" && g.RedirectURL != ""
+}
+
+// EmailConfig selects and configures the outbound email transport: Mailpit
+// (a local capture server, used in development) or Resend (a real provider,
+// used in production). Endpoints only ever see a mailer.Mailer, so the
+// choice is invisible to them.
+type EmailConfig struct {
+	Provider string // EmailProviderMailpit | EmailProviderResend
+
+	// From is the sender displayed in the From header: name + address.
+	From string
+
+	// Mailpit is the development transport: plain SMTP to a local server
+	// that captures every message and shows it in its web UI.
+	MailpitSMTPAddr string // SMTP endpoint, e.g. "mailpit:1025"
+	MailpitUIURL    string // web UI base URL, used in log hints
+
+	// ResendAPIKey authenticates the production transport (resend.com).
+	ResendAPIKey string
 }
 
 // SuperadminConfig describes the single bootstrap super admin for the app.
@@ -96,8 +120,18 @@ func Load() (*Config, error) {
 
 	cfg.PublicBaseURL = strings.TrimRight(get("PUBLIC_BASE_URL", "http://localhost:8888"), "/")
 	cfg.FrontendURL = strings.TrimRight(get("FRONTEND_URL", "http://localhost:5173"), "/")
-	cfg.EmailFrom = get("EMAIL_FROM", "QuitLARP <no-reply@example.com>")
 	cfg.GitReposDir = get("GIT_REPOS_DIR", "data/git")
+
+	cfg.Email = EmailConfig{
+		Provider:        emailProvider(cfg.Env),
+		From:            get("EMAIL_FROM", "QuitLARP <no-reply@example.com>"),
+		MailpitSMTPAddr: get("MAILPIT_SMTP_ADDR", "localhost:1025"),
+		MailpitUIURL:    strings.TrimRight(get("MAILPIT_UI_URL", "http://localhost:8025"), "/"),
+		ResendAPIKey:    os.Getenv("RESEND_API_KEY"),
+	}
+	if cfg.Env == "production" && cfg.Email.Provider == EmailProviderMailpit {
+		log.Printf("WARNING: EMAIL_PROVIDER=mailpit in production — emails are captured, not delivered. Set EMAIL_PROVIDER=resend and RESEND_API_KEY before deploying.")
+	}
 
 	cfg.Google = GoogleConfig{
 		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
@@ -115,6 +149,18 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// emailProvider resolves EMAIL_PROVIDER, falling back to the environment:
+// development captures mail with Mailpit, production delivers via Resend.
+func emailProvider(env string) string {
+	if provider := strings.ToLower(get("EMAIL_PROVIDER", "")); provider != "" {
+		return provider
+	}
+	if env == "production" {
+		return EmailProviderResend
+	}
+	return EmailProviderMailpit
 }
 
 func get(key, fallback string) string {
