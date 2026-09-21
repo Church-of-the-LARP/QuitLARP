@@ -25,15 +25,14 @@ const (
 	gitReceivePack = "git-receive-pack"
 )
 
-var repoIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+var repoPathPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(/[A-Za-z0-9][A-Za-z0-9._-]{0,63})*$`)
 
 var errInvalidRepo = errors.New("invalid repository name")
 
 func (h *Handlers) GitHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /git/{repoId}/info/refs", h.gitInfoRefs)
-	mux.HandleFunc("POST /git/{repoId}/git-upload-pack", h.gitRPC(gitUploadPack))
-	mux.HandleFunc("POST /git/{repoId}/git-receive-pack", h.gitRPC(gitReceivePack))
+	mux.HandleFunc("GET /git/{repo...}", h.gitInfoRefs)
+	mux.HandleFunc("POST /git/{repo...}", h.gitRPC)
 	return middleware.Authenticate(h.tokens, mux)
 }
 
@@ -67,13 +66,19 @@ func (h *Handlers) gitInfoRefs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	repoID, ok := strings.CutSuffix(r.PathValue("repo"), "/info/refs")
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
 	service := r.URL.Query().Get("service")
 	if service != gitUploadPack && service != gitReceivePack {
 		http.Error(w, "only the smart HTTP protocol is supported", http.StatusForbidden)
 		return
 	}
 
-	dir, err := h.gitRepoDir(r.PathValue("repoId"))
+	dir, err := h.gitRepoDir(repoID)
 	if err != nil {
 		writeGitFailure(w, err)
 		return
@@ -99,66 +104,77 @@ func (h *Handlers) gitInfoRefs(w http.ResponseWriter, r *http.Request) {
 
 // gitRPC proxies a POST body to `git <service> --stateless-rpc` and streams
 // the result back (including the progress sideband for pushes).
-func (h *Handlers) gitRPC(service string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := h.gitUser(w, r); !ok {
-			return
-		}
+func (h *Handlers) gitRPC(w http.ResponseWriter, r *http.Request) {
+	path := r.PathValue("repo")
+	var service, repoID string
+	switch {
+	case strings.HasSuffix(path, "/"+gitUploadPack):
+		service, repoID = gitUploadPack, strings.TrimSuffix(path, "/"+gitUploadPack)
+	case strings.HasSuffix(path, "/"+gitReceivePack):
+		service, repoID = gitReceivePack, strings.TrimSuffix(path, "/"+gitReceivePack)
+	default:
+		http.NotFound(w, r)
+		return
+	}
 
-		dir, err := h.gitRepoDir(r.PathValue("repoId"))
-		if err != nil {
-			writeGitFailure(w, err)
-			return
-		}
+	if _, ok := h.gitUser(w, r); !ok {
+		return
+	}
 
-		cmd := exec.CommandContext(r.Context(), "git", gitCommandName(service), "--stateless-rpc", dir)
-		cmd.Env = append(os.Environ(), gitProtocolEnv(r)...)
-		cmd.Stdin = r.Body
-		defer r.Body.Close()
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
+	dir, err := h.gitRepoDir(repoID)
+	if err != nil {
+		writeGitFailure(w, err)
+		return
+	}
 
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			writeGitFailure(w, fmt.Errorf("git %s in %s: %w", service, dir, err))
-			return
-		}
-		if err := cmd.Start(); err != nil {
-			writeGitFailure(w, fmt.Errorf("git %s in %s: %w", service, dir, err))
-			return
-		}
+	cmd := exec.CommandContext(r.Context(), "git", gitCommandName(service), "--stateless-rpc", dir)
+	cmd.Env = append(os.Environ(), gitProtocolEnv(r)...)
+	cmd.Stdin = r.Body
+	defer r.Body.Close()
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
-		// git consumes the request body as it produces output; we forward
-		// that output as it arrives.
-		w.Header().Set("Content-Type", "application/x-"+service+"-result")
-		w.Header().Set("Cache-Control", "no-cache, max-age=0, must-revalidate")
-		w.WriteHeader(http.StatusOK)
-		_, _ = io.Copy(flushWriter{w}, stdout)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		writeGitFailure(w, fmt.Errorf("git %s in %s: %w", service, dir, err))
+		return
+	}
+	if err := cmd.Start(); err != nil {
+		writeGitFailure(w, fmt.Errorf("git %s in %s: %w", service, dir, err))
+		return
+	}
 
-		if err := cmd.Wait(); err != nil {
-			log.Printf("git %s in %s failed: %v: %s", service, dir, err, strings.TrimSpace(stderr.String()))
-			return
-		}
-		if service == gitReceivePack {
-			gitAlignHead(dir)
-		}
+	// git consumes the request body as it produces output; we forward
+	// that output as it arrives.
+	w.Header().Set("Content-Type", "application/x-"+service+"-result")
+	w.Header().Set("Cache-Control", "no-cache, max-age=0, must-revalidate")
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(flushWriter{w}, stdout)
+
+	if err := cmd.Wait(); err != nil {
+		log.Printf("git %s in %s failed: %v: %s", service, dir, err, strings.TrimSpace(stderr.String()))
+		return
+	}
+	if service == gitReceivePack {
+		gitAlignHead(dir)
 	}
 }
 
 // gitRepoDir resolves the bare repository for repoID and creates it on first
 // use. The ".git" suffix git clients put in URLs is accepted and normalized
-// away, so /git/demo and /git/demo.git are the same repository.
+// away, so /git/demo and /git/demo.git are the same repository. Nested names
+// such as assessments/assessment-1 map to nested directories.
 func (h *Handlers) gitRepoDir(repoID string) (string, error) {
 	id := strings.TrimSuffix(repoID, ".git")
-	if !repoIDPattern.MatchString(id) {
+	if len(id) > 255 || !repoPathPattern.MatchString(id) {
 		return "", fmt.Errorf("%w: %q", errInvalidRepo, repoID)
 	}
-	dir := filepath.Join(h.cfg.GitReposDir, id+".git")
+	dir := filepath.Join(h.cfg.GitReposDir, filepath.FromSlash(id+".git"))
 
 	if _, err := os.Stat(filepath.Join(dir, "HEAD")); err == nil {
 		return dir, nil
 	}
-	if err := os.MkdirAll(h.cfg.GitReposDir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return "", fmt.Errorf("create repos dir: %w", err)
 	}
 	// Bare: no working tree to get in the way of pushes. HEAD starts on
@@ -234,7 +250,7 @@ func (f flushWriter) Write(p []byte) (int, error) {
 func writeGitFailure(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, errInvalidRepo):
-		writeProblem(w, http.StatusBadRequest, "invalid repository name — use letters, digits, '.', '-' or '_'")
+		writeProblem(w, http.StatusBadRequest, "invalid repository name: path segments use letters, digits, '.', '-' or '_'")
 	case errors.Is(err, exec.ErrNotFound):
 		log.Printf("git: the git binary is not installed — the local git server needs it (see backend/Dockerfile)")
 		writeProblem(w, http.StatusInternalServerError, "git service unavailable")

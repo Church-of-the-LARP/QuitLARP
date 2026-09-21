@@ -99,6 +99,15 @@ const chapterInputClass =
 
 export default function Create() {
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
+  const [repoUrl, setRepoUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyRepoUrl = async () => {
+    if (!repoUrl) return;
+    await navigator.clipboard.writeText(repoUrl);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+  };
 
   const form = useForm({
     defaultValues: {
@@ -178,7 +187,18 @@ export default function Create() {
           return;
         }
 
-        console.log('Assessment created:', res.data?.assessment);
+        const assessmentId = res.data?.assessment.id;
+        if (assessmentId === undefined) return;
+
+        const repo = await client.GET('/api/v1/assessments/{id}/repo', {
+          params: { path: { id: assessmentId } },
+        });
+        if (repo.error) {
+          setAlertMsg(getErrorText(repo.error, 'Could not load the repository link'));
+          return;
+        }
+        setCopied(false);
+        setRepoUrl(repo.data?.url ?? null);
       } catch (err) {
         console.error('Failed to create assessment', err);
         setAlertMsg('Could not create the assessment');
@@ -188,6 +208,31 @@ export default function Create() {
 
   return (
     <main className="mx-auto w-[60vw] flex flex-col gap-5 py-6">
+      <button
+        type="button"
+        onClick={copyRepoUrl}
+        disabled={!repoUrl}
+        className={`flex w-full items-center gap-3 rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-left transition ${
+          repoUrl ? 'cursor-pointer hover:border-zinc-500' : 'cursor-default'
+        }`}
+      >
+        <span
+          className={`h-3 w-3 shrink-0 rounded-full ${repoUrl ? 'bg-teal-500' : 'bg-zinc-700'}`}
+        />
+        <span
+          className={`flex-1 truncate font-mono text-sm ${
+            repoUrl ? 'text-zinc-200' : 'text-zinc-500'
+          }`}
+        >
+          {repoUrl ?? 'Your git link appears here after you create the assessment'}
+        </span>
+        {repoUrl && (
+          <span className="shrink-0 text-xs font-semibold text-zinc-400">
+            {copied ? 'Copied' : 'Copy'}
+          </span>
+        )}
+      </button>
+
       <h1 className="font-bold text-3xl mb-6 text-zinc-100">Create assessment</h1>
 
       {alertMsg && <Alert kind="error" text={alertMsg} />}
