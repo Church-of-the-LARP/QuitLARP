@@ -45,6 +45,7 @@ func (h *Handlers) Register(api huma.API) {
 	h.registerEmailFlows(api)
 	h.registerUsers(api)
 	h.registerAssessments(api)
+	h.registerAssessmentGit(api)
 	h.registerAssessmentChapters(api)
 	h.registerAssessmentTests(api)
 	h.registerTags(api)

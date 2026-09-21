@@ -15,6 +15,7 @@ import ResetPassword from "./pages/ResetPassword.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Users from "./pages/Users.tsx";
 import Create from "./pages/Create.tsx";
+import AssessmentGit from "./pages/AssessmentGit.tsx";
 import Layout from "./components/Layout.tsx";
 import { AuthProvider } from "./scripts/useAuth.tsx";
 import "./index.css";
@@ -35,6 +36,7 @@ createRoot(document.getElementById("root")!).render(
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/create" element={<Create />} />
+              <Route path="/assessments/:id/git" element={<AssessmentGit />} />
               <Route element={<SecuredRoute roles={["admin", "superadmin"]} />}>
                 <Route path="/users" element={<Users />} />
               </Route>
