@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Difficulty is the rating of an assessment, mirroring the three LeetCode
 // tiers. Kept as a string for readable payloads; validated on the way in.
@@ -117,6 +120,12 @@ type Assessment struct {
 	Tests            []TestSummary `json:"tests" doc:"Hidden tests, name and description only"`
 	CreatedAt        time.Time     `json:"createdAt" db:"created_at" doc:"Creation time"`
 	UpdatedAt        time.Time     `json:"updatedAt" db:"updated_at" doc:"Last modification time"`
+}
+
+// AssessmentRepoID is the path of the git repository that backs an
+// assessment on the local git server.
+func AssessmentRepoID(id int64) string {
+	return fmt.Sprintf("assessments/assessment-%d", id)
 }
 
 // ChapterDraft is a chapter as supplied when creating an assessment or

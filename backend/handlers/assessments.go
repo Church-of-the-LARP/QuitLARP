@@ -114,6 +114,14 @@ type AssessmentOutput struct {
 	}
 }
 
+// AssessmentRepoOutput is the response of GET /api/v1/assessments/{id}/repo.
+type AssessmentRepoOutput struct {
+	Body struct {
+		RepoID string `json:"repoId" doc:"Repository path on the local git server"`
+		URL    string `json:"url" doc:"Clone URL of the repository that backs the assessment"`
+	}
+}
+
 // AssessmentListOutput is the response of GET /api/v1/assessments.
 type AssessmentListOutput struct {
 	Body struct {
@@ -262,6 +270,26 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		}
 		resp := &AssessmentOutput{}
 		resp.Body.Assessment = got
+		return resp, nil
+	})
+
+	// GET /api/v1/assessments/{id}/repo: author or admin.
+	huma.Register(api, huma.Operation{
+		OperationID: "getAssessmentRepo",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/assessments/{id}/repo",
+		Summary:     "Get the git repository of an assessment",
+		Description: "The author of the assessment or an admin/superadmin may read the repository that backs it; the link is where the assignment content gets pushed.",
+	}, func(ctx context.Context, input *struct {
+		ID int64 `path:"id" example:"1" doc:"Assessment id"`
+	}) (*AssessmentRepoOutput, error) {
+		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
+			return nil, err
+		}
+		repoID := models.AssessmentRepoID(input.ID)
+		resp := &AssessmentRepoOutput{}
+		resp.Body.RepoID = repoID
+		resp.Body.URL = h.cfg.PublicBaseURL + "/git/" + repoID + ".git"
 		return resp, nil
 	})
 

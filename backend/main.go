@@ -18,7 +18,7 @@ import (
 	"backend/supervisor"
 )
 
-var containerSupervisor *supervisor.Supervisor
+var containerSupervisor = &supervisor.Supervisor{}
 
 func init() {
 	containerSupervisor.Init()
