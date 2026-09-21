@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useForm } from '@tanstack/react-form';
+import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import client, { getErrorText } from '../scripts/api';
 import Alert from '../components/Alert.tsx';
@@ -100,6 +101,7 @@ const chapterInputClass =
 export default function Create() {
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [repoUrl, setRepoUrl] = useState<string | null>(null);
+  const [repoForId, setRepoForId] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
   const copyRepoUrl = async () => {
@@ -199,6 +201,7 @@ export default function Create() {
         }
         setCopied(false);
         setRepoUrl(repo.data?.url ?? null);
+        setRepoForId(assessmentId);
       } catch (err) {
         console.error('Failed to create assessment', err);
         setAlertMsg('Could not create the assessment');
@@ -232,6 +235,15 @@ export default function Create() {
           </span>
         )}
       </button>
+
+      {repoForId !== null && repoUrl && (
+        <Link
+          to={`/assessments/${repoForId}/git`}
+          className="self-start text-sm font-semibold text-teal-400 transition hover:text-teal-300"
+        >
+          Browse the files of this assessment repository
+        </Link>
+      )}
 
       <h1 className="font-bold text-3xl mb-6 text-zinc-100">Create assessment</h1>
 
