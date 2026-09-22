@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 export default function LandingNavbar() {
   return (
-    <header className="border-b border-line bg-panel">
+    <header className="relative z-20 border-b border-line bg-panel shadow-lg shadow-black/30">
       <div className="mx-auto flex w-[75vw] items-center justify-between py-3">
         <Link to="/" className="text-sm font-semibold text-ink">
           QuitLARP

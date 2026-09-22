@@ -76,21 +76,21 @@ function VerifyEmailBanner({
   };
 
   return (
-    <div className="mb-6 rounded-md border border-accent bg-surface px-4 py-3 text-sm text-accent">
+    <div className="mb-6 rounded-md border border-warning bg-warning/80 px-4 py-3 text-sm text-shell">
       <p className="font-medium">Verify your email address</p>
-      <p className="mt-0.5 text-accent">
+      <p className="mt-0.5 text-shell/80">
         We emailed a verification link to{" "}
         <span className="font-semibold">{user?.email}</span>. Didn't get it?{" "}
         <button
           onClick={() => handleResend()}
-          className="font-semibold underline underline-offset-2 hover:text-accent-light"
+          className="font-semibold underline underline-offset-2 hover:text-panel"
         >
           Resend the email
         </button>
         .
       </p>
       <button
-        className="absolute top-1 right-3 p-2 hover:text-accent-light"
+        className="absolute top-1 right-3 p-2 hover:text-panel"
         onClick={() => setCloseEmail(true)}
       >
         X

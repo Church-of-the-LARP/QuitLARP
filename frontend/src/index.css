@@ -2,19 +2,19 @@
 
 @theme {
   /* text */
-  --color-ink: var(--color-zinc-100); /* primary text */
-  --color-muted: var(--color-zinc-400); /* secondary/helper text */
-  --color-dim: var(--color-zinc-500); /* disabled/least-important text */
+  --color-ink: var(--color-stone-100); /* primary text */
+  --color-muted: var(--color-stone-400); /* secondary/helper text */
+  --color-dim: var(--color-stone-500); /* disabled/least-important text */
 
   /* backgrounds */
-  --color-shell: var(--color-zinc-950); /* page/root background */
-  --color-panel: var(--color-zinc-900); /* nav header, auth card container */
-  --color-surface: var(--color-zinc-800); /* card/sidebar background */
-  --color-raised: var(--color-zinc-700); /* hover backgrounds, subtle pills */
+  --color-shell: var(--color-stone-950); /* page/root background */
+  --color-panel: var(--color-stone-900); /* nav header, auth card container */
+  --color-surface: var(--color-stone-800); /* card/sidebar background */
+  --color-raised: var(--color-stone-700); /* hover backgrounds, subtle pills */
 
   /* borders */
-  --color-line: var(--color-zinc-800); /* default border/divider */
-  --color-line-hover: var(--color-zinc-700); /* hover/emphasis border */
+  --color-line: var(--color-stone-800); /* default border/divider */
+  --color-line-hover: var(--color-stone-700); /* hover/emphasis border */
 
   /* primary accent (olive) */
   --color-accent: var(--color-olive-500); /* buttons, focus ring, active state */
@@ -25,12 +25,12 @@
   --color-accent-secondary: var(--color-mauve-500);
   --color-accent-secondary-hover: var(--color-mauve-400);
 
-  /* semantic status */
-  --color-success: var(--color-emerald-400);
-  --color-warning: var(--color-amber-400);
-  --color-warning-light: var(--color-amber-300);
-  --color-danger: var(--color-rose-400);
-  --color-danger-light: var(--color-rose-300);
+  /* semantic status (muted toward the accent palette, still identifiable) */
+  --color-success: oklch(74% 0.09 163);
+  --color-warning: oklch(78% 0.09 84);
+  --color-warning-light: oklch(85% 0.08 90);
+  --color-danger: oklch(70% 0.09 15);
+  --color-danger-light: oklch(80% 0.07 15);
 }
 
 @layer base {

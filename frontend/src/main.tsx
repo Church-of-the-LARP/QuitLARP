@@ -22,6 +22,7 @@ import { AuthProvider } from "./scripts/useAuth.tsx";
 import "./index.css";
 import Pricing from "./pages/Pricing.tsx";
 import Landing from "./pages/Landing.tsx";
+import AssessmentPreview from "./pages/AssessmentPreview.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -44,6 +45,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/create" element={<Create />} />
               <Route path="/assessments/:id/git" element={<AssessmentGit />} />
+              <Route path="/assessments/preview/" element={<AssessmentPreview />} />
               <Route element={<SecuredRoute roles={["admin", "superadmin"]} />}>
                 <Route path="/users" element={<Users />} />
               </Route>
