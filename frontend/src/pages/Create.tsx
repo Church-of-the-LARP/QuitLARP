@@ -94,9 +94,9 @@ const schema = z
   });
 
 const inputClass =
-  'w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30';
+  'w-full rounded-xl border border-line-hover bg-panel px-3 py-2 text-ink outline-none placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30';
 const chapterInputClass =
-  'w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30';
+  'w-full rounded-xl border border-line-hover bg-surface px-3 py-2 text-ink outline-none placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30';
 
 export default function Create() {
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
@@ -215,22 +215,22 @@ export default function Create() {
         type="button"
         onClick={copyRepoUrl}
         disabled={!repoUrl}
-        className={`flex w-full items-center gap-3 rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-left transition ${
-          repoUrl ? 'cursor-pointer hover:border-zinc-500' : 'cursor-default'
+        className={`flex w-full items-center gap-3 rounded-full border border-line-hover bg-panel px-4 py-2 text-left transition ${
+          repoUrl ? 'cursor-pointer hover:border-dim' : 'cursor-default'
         }`}
       >
         <span
-          className={`h-3 w-3 shrink-0 rounded-full ${repoUrl ? 'bg-teal-500' : 'bg-zinc-700'}`}
+          className={`h-3 w-3 shrink-0 rounded-full ${repoUrl ? 'bg-accent' : 'bg-raised'}`}
         />
         <span
           className={`flex-1 truncate font-mono text-sm ${
-            repoUrl ? 'text-zinc-200' : 'text-zinc-500'
+            repoUrl ? 'text-muted' : 'text-dim'
           }`}
         >
           {repoUrl ?? 'Your git link appears here after you create the assessment'}
         </span>
         {repoUrl && (
-          <span className="shrink-0 text-xs font-semibold text-zinc-400">
+          <span className="shrink-0 text-xs font-semibold text-muted">
             {copied ? 'Copied' : 'Copy'}
           </span>
         )}
@@ -239,13 +239,13 @@ export default function Create() {
       {repoForId !== null && repoUrl && (
         <Link
           to={`/assessments/${repoForId}/git`}
-          className="self-start text-sm font-semibold text-teal-400 transition hover:text-teal-300"
+          className="self-start text-sm font-semibold text-accent-light transition hover:text-accent-lighter"
         >
           Browse the files of this assessment repository
         </Link>
       )}
 
-      <h1 className="font-bold text-3xl mb-6 text-zinc-100">Create assessment</h1>
+      <h1 className="font-bold text-3xl mb-6 text-ink">Create assessment</h1>
 
       {alertMsg && <Alert kind="error" text={alertMsg} />}
 
@@ -257,13 +257,13 @@ export default function Create() {
         }}
         className="flex flex-col gap-5"
       >
-        <div className="rounded-xl border border-zinc-700 bg-zinc-800 p-6 flex flex-col gap-8">
+        <div className="rounded-xl border border-line-hover bg-surface p-6 flex flex-col gap-8">
           <section>
-            <h2 className="mb-4 text-lg font-semibold text-zinc-100">Assessment details</h2>
+            <h2 className="mb-4 text-lg font-semibold text-ink">Assessment details</h2>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className="mb-1 block font-semibold text-zinc-200">Assessment title</label>
+                <label className="mb-1 block font-semibold text-muted">Assessment title</label>
                 <form.Field name="title">
                   {(field) => (
                     <>
@@ -282,7 +282,7 @@ export default function Create() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="mb-1 block font-semibold text-zinc-200">Assessment description</label>
+                <label className="mb-1 block font-semibold text-muted">Assessment description</label>
                 <form.Field name="description">
                   {(field) => (
                     <>
@@ -301,7 +301,7 @@ export default function Create() {
               </div>
 
               <div>
-                <label className="mb-1 block font-semibold text-zinc-200">Difficulty level</label>
+                <label className="mb-1 block font-semibold text-muted">Difficulty level</label>
                 <form.Field name="difficulty">
                   {(field) => (
                     <select
@@ -319,7 +319,7 @@ export default function Create() {
               </div>
 
               <div>
-                <label className="mb-1 block font-semibold text-zinc-200">
+                <label className="mb-1 block font-semibold text-muted">
                   Time limit (minutes)
                 </label>
                 <form.Field name="timeLimitMinutes">
@@ -341,7 +341,7 @@ export default function Create() {
               </div>
 
               <div>
-                <label className="mb-1 block font-semibold text-zinc-200">
+                <label className="mb-1 block font-semibold text-muted">
                   Starter template file name
                 </label>
                 <form.Field name="templateFileName">
@@ -362,7 +362,7 @@ export default function Create() {
               </div>
 
               <div>
-                <label className="mb-1 block font-semibold text-zinc-200">
+                <label className="mb-1 block font-semibold text-muted">
                   Tags (comma separated)
                 </label>
                 <form.Field name="tags">
@@ -380,7 +380,7 @@ export default function Create() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="mb-1 block font-semibold text-zinc-200">
+                <label className="mb-1 block font-semibold text-muted">
                   Starter template content
                 </label>
                 <form.Field name="templateContent">
@@ -399,12 +399,12 @@ export default function Create() {
             </div>
           </section>
 
-          <section className="border-t border-zinc-700 pt-8">
+          <section className="border-t border-line-hover pt-8">
             <form.Field name="chapters" mode="array">
               {(chaptersField) => (
                 <>
                   <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-zinc-100">Chapters</h2>
+                    <h2 className="text-lg font-semibold text-ink">Chapters</h2>
                     <button
                       type="button"
                       onClick={() => {
@@ -420,7 +420,7 @@ export default function Create() {
                           timeLimitMinutes: '',
                         });
                       }}
-                      className="text-zinc-950 px-3 py-1 bg-teal-500 hover:bg-teal-400 rounded-xl text-sm font-semibold"
+                      className="text-shell px-3 py-1 bg-accent hover:bg-accent-light rounded-xl text-sm font-semibold"
                     >
                       + Add chapter
                     </button>
@@ -430,17 +430,17 @@ export default function Create() {
                     {chaptersField.state.value.map((chapter, index) => (
                       <div
                         key={index}
-                        className="rounded-xl border border-zinc-700 bg-zinc-900 p-4"
+                        className="rounded-xl border border-line-hover bg-panel p-4"
                       >
                         <div className="mb-3 flex items-center justify-between">
-                          <span className="font-semibold text-zinc-100">
+                          <span className="font-semibold text-ink">
                             Chapter {chapter.number}
                           </span>
                           {chaptersField.state.value.length > 1 && (
                             <button
                               type="button"
                               onClick={() => chaptersField.removeValue(index)}
-                              className="text-sm text-rose-400 hover:text-rose-300"
+                              className="text-sm text-danger hover:text-danger-light"
                             >
                               Remove
                             </button>
@@ -449,7 +449,7 @@ export default function Create() {
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div>
-                            <label className="mb-1 block font-semibold text-zinc-200">
+                            <label className="mb-1 block font-semibold text-muted">
                               Chapter title
                             </label>
                             <form.Field name={`chapters[${index}].title`}>
@@ -470,7 +470,7 @@ export default function Create() {
                           </div>
 
                           <div>
-                            <label className="mb-1 block font-semibold text-zinc-200">
+                            <label className="mb-1 block font-semibold text-muted">
                               Chapter time limit (minutes)
                             </label>
                             <form.Field name={`chapters[${index}].timeLimitMinutes`}>
@@ -492,7 +492,7 @@ export default function Create() {
                           </div>
 
                           <div className="sm:col-span-2">
-                            <label className="mb-1 block font-semibold text-zinc-200">
+                            <label className="mb-1 block font-semibold text-muted">
                               Chapter description
                             </label>
                             <form.Field name={`chapters[${index}].description`}>
@@ -520,12 +520,12 @@ export default function Create() {
             </form.Field>
           </section>
 
-          <section className="border-t border-zinc-700 pt-8">
-            <h2 className="mb-4 text-lg font-semibold text-zinc-100">Optional hidden test</h2>
+          <section className="border-t border-line-hover pt-8">
+            <h2 className="mb-4 text-lg font-semibold text-ink">Optional hidden test</h2>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block font-semibold text-zinc-200">
+                <label className="mb-1 block font-semibold text-muted">
                   Hidden test name
                 </label>
                 <form.Field name="testName">
@@ -546,7 +546,7 @@ export default function Create() {
               </div>
 
               <div>
-                <label className="mb-1 block font-semibold text-zinc-200">
+                <label className="mb-1 block font-semibold text-muted">
                   Hidden test file name
                 </label>
                 <form.Field name="testFileName">
@@ -567,7 +567,7 @@ export default function Create() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="mb-1 block font-semibold text-zinc-200">
+                <label className="mb-1 block font-semibold text-muted">
                   Hidden test description
                 </label>
                 <form.Field name="testDescription">
@@ -588,7 +588,7 @@ export default function Create() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="mb-1 block font-semibold text-zinc-200">
+                <label className="mb-1 block font-semibold text-muted">
                   Hidden test file content
                 </label>
                 <form.Field name="testContent">
@@ -613,7 +613,7 @@ export default function Create() {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="self-center text-zinc-950 font-semibold px-6 py-2 bg-teal-500 hover:bg-teal-400 rounded-xl disabled:opacity-60"
+              className="self-center text-shell font-semibold px-6 py-2 bg-accent hover:bg-accent-light rounded-xl disabled:opacity-60"
             >
               {isSubmitting ? 'Creating…' : 'Create assessment'}
             </button>

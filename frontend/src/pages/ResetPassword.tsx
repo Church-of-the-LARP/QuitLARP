@@ -52,13 +52,13 @@ function App() {
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6">
-      <div className="w-126 max-w-sm rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-sm">
-        <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-zinc-100">
+    <div className="flex min-h-screen items-center justify-center bg-shell px-6">
+      <div className="w-126 max-w-sm rounded-xl border border-line bg-panel p-8 shadow-sm">
+        <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-ink">
           QuitLARP
         </div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Reset your password</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <h1 className="text-2xl font-semibold text-ink">Reset your password</h1>
+        <p className="mt-1 text-sm text-muted">
           Choose a new password for your account
         </p>
 
@@ -71,7 +71,7 @@ function App() {
         {alertMsg?.kind === 'notice' ? (
           <Link
             to="/login"
-            className="mt-6 block w-full rounded-md bg-teal-500 px-4 py-2 text-center text-sm font-medium text-zinc-950 hover:bg-teal-400"
+            className="mt-6 block w-full rounded-md bg-accent px-4 py-2 text-center text-sm font-medium text-shell hover:bg-accent-light"
           >
             Go to sign in
           </Link>
@@ -109,7 +109,7 @@ function App() {
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className="w-full rounded-md bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 disabled:opacity-60"
+                  className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-shell hover:bg-accent-light disabled:opacity-60"
                 >
                   {isSubmitting ? 'Updating…' : 'Update password'}
                 </button>

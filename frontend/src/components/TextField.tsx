@@ -16,7 +16,7 @@ export default function TextField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
+      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">
         {label}
       </span>
       <input
@@ -28,7 +28,7 @@ export default function TextField({
         value={field.state.value}
         onBlur={field.handleBlur}
         onChange={(e) => field.handleChange(e.target.value)}
-        className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30"
+        className="w-full rounded-md border border-line-hover bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
       />
       <FieldErrors field={field} />
     </label>

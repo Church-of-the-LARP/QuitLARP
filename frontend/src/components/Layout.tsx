@@ -15,14 +15,14 @@ export default function Layout() {
   const isAdmin = user.role === "admin" || user.role === "superadmin";
 
   const roleStyles: Record<Role, string> = {
-    user: "bg-zinc-700 text-zinc-300",
-    admin: "bg-teal-400/20 text-teal-400",
-    superadmin: "bg-amber-400/20 text-amber-400",
+    user: "bg-raised text-muted",
+    admin: "bg-accent-light/20 text-accent-light",
+    superadmin: "bg-warning/20 text-warning",
   };
 
   return (
     <>
-      <div className="min-h-screen bg-zinc-950">
+      <div className="min-h-screen bg-shell">
         <Navbar
           user={user}
           isAdmin={isAdmin}

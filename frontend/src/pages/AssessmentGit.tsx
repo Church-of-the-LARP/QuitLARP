@@ -128,18 +128,18 @@ export default function AssessmentGit() {
   return (
     <main className="mx-auto flex w-[60vw] flex-col gap-5 py-6">
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase text-teal-400">Repository</p>
-        <h1 className="text-3xl font-bold text-zinc-100">Files</h1>
+        <p className="mb-2 text-xs font-semibold uppercase text-accent-light">Repository</p>
+        <h1 className="text-3xl font-bold text-ink">Files</h1>
       </div>
 
       {forbidden ? (
-        <div className="rounded-xl border border-zinc-700 bg-zinc-800 p-6 text-zinc-300">
+        <div className="rounded-xl border border-line-hover bg-surface p-6 text-muted">
           Only the author or an admin can browse this repository.
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-zinc-700 bg-zinc-800 p-6 text-rose-400">{error}</div>
+        <div className="rounded-xl border border-line-hover bg-surface p-6 text-danger">{error}</div>
       ) : (
-        <div className="flex flex-col gap-4 rounded-xl border border-zinc-700 bg-zinc-800 p-6">
+        <div className="flex flex-col gap-4 rounded-xl border border-line-hover bg-surface p-6">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <button
               type="button"
@@ -147,20 +147,20 @@ export default function AssessmentGit() {
                 backToTree();
                 setPath('');
               }}
-              className="font-mono font-semibold text-teal-400 transition hover:text-teal-300"
+              className="font-mono font-semibold text-accent-light transition hover:text-accent-lighter"
             >
               {ref || 'repository'}
             </button>
             {segments.map((segment, index) => (
               <span key={`${segment}-${index}`} className="flex items-center gap-2">
-                <span className="text-zinc-600">/</span>
+                <span className="text-dim">/</span>
                 <button
                   type="button"
                   onClick={() => {
                     backToTree();
                     setPath(segments.slice(0, index + 1).join('/'));
                   }}
-                  className="font-mono text-zinc-300 transition hover:text-teal-300"
+                  className="font-mono text-muted transition hover:text-accent-lighter"
                 >
                   {segment}
                 </button>
@@ -169,46 +169,46 @@ export default function AssessmentGit() {
           </div>
 
           {loading ? (
-            <p className="text-zinc-400">Loading...</p>
+            <p className="text-muted">Loading...</p>
           ) : empty ? (
-            <p className="text-zinc-400">No commits yet. Push to main to see files here.</p>
+            <p className="text-muted">No commits yet. Push to main to see files here.</p>
           ) : fileTarget !== null ? (
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={backToTree}
-                  className="text-sm font-semibold text-teal-400 transition hover:text-teal-300"
+                  className="text-sm font-semibold text-accent-light transition hover:text-accent-lighter"
                 >
                   &larr; Back to files
                 </button>
-                <span className="font-mono text-xs text-zinc-500">
+                <span className="font-mono text-xs text-dim">
                   {file ? `${formatSize(file.size)} - ${file.path}` : fileTarget}
                 </span>
               </div>
 
               {fileLoading ? (
-                <p className="text-zinc-400">Loading...</p>
+                <p className="text-muted">Loading...</p>
               ) : fileError ? (
-                <p className="text-rose-400">{fileError}</p>
+                <p className="text-danger">{fileError}</p>
               ) : file?.binary ? (
-                <p className="text-zinc-400">
+                <p className="text-muted">
                   This file looks binary and cannot be displayed.
                 </p>
               ) : file?.truncated ? (
-                <p className="text-zinc-400">
+                <p className="text-muted">
                   This file is too large to display ({formatSize(file.size)}).
                 </p>
               ) : (
-                <pre className="max-h-[70vh] overflow-auto rounded-lg border border-zinc-700 bg-zinc-900 p-4 font-mono text-sm leading-relaxed text-zinc-200">
+                <pre className="max-h-[70vh] overflow-auto rounded-lg border border-line-hover bg-panel p-4 font-mono text-sm leading-relaxed text-muted">
                   {file?.content ?? ''}
                 </pre>
               )}
             </div>
           ) : entries.length === 0 ? (
-            <p className="text-zinc-400">This directory is empty.</p>
+            <p className="text-muted">This directory is empty.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-zinc-700">
+            <ul className="flex flex-col divide-y divide-line-hover">
               {entries.map((entry) => (
                 <li key={entry.name}>
                   {entry.type === 'tree' ? (
@@ -217,19 +217,19 @@ export default function AssessmentGit() {
                       onClick={() => {
                         setPath(joinPath(path, entry.name));
                       }}
-                      className="flex w-full items-center gap-3 px-1 py-2 text-left transition hover:bg-zinc-700/40"
+                      className="flex w-full items-center gap-3 px-1 py-2 text-left transition hover:bg-raised/40"
                     >
-                      <span className="font-mono text-sm text-teal-400">{entry.name}/</span>
-                      <span className="ml-auto text-xs text-zinc-500">directory</span>
+                      <span className="font-mono text-sm text-accent-light">{entry.name}/</span>
+                      <span className="ml-auto text-xs text-dim">directory</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => openFile(entry.name)}
-                      className="flex w-full items-center gap-3 px-1 py-2 text-left transition hover:bg-zinc-700/40"
+                      className="flex w-full items-center gap-3 px-1 py-2 text-left transition hover:bg-raised/40"
                     >
-                      <span className="font-mono text-sm text-zinc-200">{entry.name}</span>
-                      <span className="ml-auto font-mono text-xs text-zinc-500">
+                      <span className="font-mono text-sm text-muted">{entry.name}</span>
+                      <span className="ml-auto font-mono text-xs text-dim">
                         {formatSize(entry.size)}
                       </span>
                     </button>
@@ -241,7 +241,7 @@ export default function AssessmentGit() {
         </div>
       )}
 
-      <Link to="/create" className="text-sm font-semibold text-teal-400 hover:text-teal-300">
+      <Link to="/create" className="text-sm font-semibold text-accent-light hover:text-accent-lighter">
         Create another assessment
       </Link>
     </main>

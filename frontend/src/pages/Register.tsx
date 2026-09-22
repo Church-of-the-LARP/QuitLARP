@@ -50,14 +50,14 @@ function App() {
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6">
-      <div className="w-126 rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-sm">
-        <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-zinc-100">
+    <div className="flex min-h-screen items-center justify-center bg-shell px-6">
+      <div className="w-126 rounded-xl border border-line bg-panel p-8 shadow-sm">
+        <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-ink">
           QuitLARP
         </div>
         <div className="mx-auto w-full max-w-sm">
-          <h1 className="text-2xl font-semibold text-zinc-100">Create your account</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <h1 className="text-2xl font-semibold text-ink">Create your account</h1>
+          <p className="mt-1 text-sm text-muted">
             Username, email and a strong password
           </p>
 
@@ -111,13 +111,13 @@ function App() {
                 />
               )}
             </form.Field>
-            <p className="text-xs text-zinc-500">At least 8 characters.</p>
+            <p className="text-xs text-dim">At least 8 characters.</p>
             <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting]}>
               {([canSubmit, isSubmitting]) => (
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className="w-full rounded-md bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 disabled:opacity-60"
+                  className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-shell hover:bg-accent-light disabled:opacity-60"
                 >
                   {isSubmitting ? 'Creating account…' : 'Register'}
                 </button>
@@ -125,24 +125,24 @@ function App() {
             </form.Subscribe>
           </form>
 
-          <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
-            <span className="h-px flex-1 bg-zinc-800" />
+          <div className="my-5 flex items-center gap-3 text-xs text-dim">
+            <span className="h-px flex-1 bg-surface" />
             or
-            <span className="h-px flex-1 bg-zinc-800" />
+            <span className="h-px flex-1 bg-surface" />
           </div>
 
           <a
             href={googleUrl}
-            className="block w-full rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-center text-sm font-medium text-zinc-300 hover:bg-zinc-700"
+            className="block w-full rounded-md border border-line-hover bg-surface px-4 py-2 text-center text-sm font-medium text-muted hover:bg-raised"
           >
             Continue with Google
           </a>
 
-          <p className="mt-5 text-center text-sm text-zinc-400">
+          <p className="mt-5 text-center text-sm text-muted">
             Already registered?{' '}
             <Link
               to="/login"
-              className="font-medium text-teal-400 hover:underline"
+              className="font-medium text-accent-light hover:underline"
             >
               Sign in
             </Link>

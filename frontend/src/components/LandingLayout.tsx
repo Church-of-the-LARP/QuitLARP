@@ -5,7 +5,7 @@ export default function LandingLayout() {
 
   return (
     <>
-      <div className="min-h-screen bg-zinc-950">
+      <div className="min-h-screen bg-shell">
         <LandingNavbar />
         <Outlet />
       </div>

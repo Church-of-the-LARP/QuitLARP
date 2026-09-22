@@ -10,9 +10,9 @@ import type {
 } from '../types/types.ts';
 
 const roleStyles: Record<Role, string> = {
-  user: 'bg-zinc-700 text-zinc-300',
-  admin: 'bg-teal-400/20 text-teal-400',
-  superadmin: 'bg-amber-400/20 text-amber-400',
+  user: 'bg-raised text-muted',
+  admin: 'bg-accent-light/20 text-accent-light',
+  superadmin: 'bg-warning/20 text-warning',
 };
 
 function VerifyEmailBanner() {
@@ -24,14 +24,14 @@ function VerifyEmailBanner() {
   };
 
   return (
-    <div className="mb-6 rounded-md border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-400">
+    <div className="mb-6 rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
       <p className="font-medium">Verify your email address</p>
-      <p className="mt-0.5 text-amber-400/80">
+      <p className="mt-0.5 text-warning/80">
         We emailed a verification link to{' '}
         <span className="font-semibold">{user?.email}</span>. Didn't get it?{' '}
         <button
           onClick={() => handleResend()}
-          className="font-semibold underline underline-offset-2 hover:text-amber-300"
+          className="font-semibold underline underline-offset-2 hover:text-warning-light"
         >
           Resend the email
         </button>
@@ -102,19 +102,19 @@ function App() {
         {isAdmin && (
           <section>
             <div className="flex items-baseline justify-between">
-              <h2 className="text-lg font-semibold text-zinc-100">Users</h2>
-              <span className="text-xs text-zinc-500">
+              <h2 className="text-lg font-semibold text-ink">Users</h2>
+              <span className="text-xs text-dim">
                 {users.length} total
               </span>
             </div>
-            <ul className="mt-3 divide-y divide-zinc-800 rounded-md border border-zinc-700 bg-zinc-800">
+            <ul className="mt-3 divide-y divide-line rounded-md border border-line-hover bg-surface">
               {users.map((u) => (
                 <li
                   key={u.id}
                   className="flex items-center justify-between gap-3 px-4 py-3"
                 >
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 text-sm font-medium text-zinc-100">
+                    <p className="flex items-center gap-2 text-sm font-medium text-ink">
                       <span className="truncate">{u.username}</span>
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${roleStyles[u.role]}`}
@@ -122,7 +122,7 @@ function App() {
                         {u.role}
                       </span>
                     </p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-zinc-400">
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
                       <span className="truncate">{u.email}</span>
                       <span>
                         {u.emailVerified ? '✓ verified' : 'unverified'}
@@ -136,7 +136,7 @@ function App() {
                         <button
                           onClick={() => handleRoleChange(u, 'admin')}
                           disabled={loadingId === u.id}
-                          className="rounded-md border border-teal-400/30 px-2.5 py-1 text-xs font-medium text-teal-400 hover:bg-teal-400/10 disabled:opacity-50"
+                          className="rounded-md border border-accent-light/30 px-2.5 py-1 text-xs font-medium text-accent-light hover:bg-accent-light/10 disabled:opacity-50"
                         >
                           Make admin
                         </button>
@@ -144,7 +144,7 @@ function App() {
                         <button
                           onClick={() => handleRoleChange(u, 'user')}
                           disabled={loadingId === u.id}
-                          className="rounded-md border border-zinc-700 px-2.5 py-1 text-xs font-medium text-zinc-400 hover:bg-zinc-700 disabled:opacity-50"
+                          className="rounded-md border border-line-hover px-2.5 py-1 text-xs font-medium text-muted hover:bg-raised disabled:opacity-50"
                         >
                           Revoke admin
                         </button>
@@ -154,7 +154,7 @@ function App() {
                 </li>
               ))}
               {users.length === 0 && (
-                <li className="px-4 py-8 text-center text-sm text-zinc-500">
+                <li className="px-4 py-8 text-center text-sm text-dim">
                   No users yet
                 </li>
               )}
