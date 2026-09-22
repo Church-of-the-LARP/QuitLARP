@@ -5,7 +5,7 @@ export default function LandingLayout() {
 
   return (
     <>
-      <div className="min-h-screen bg-shell">
+      <div className="min-h-screen bg-shell flex flex-col">
         <LandingNavbar />
         <Outlet />
       </div>
