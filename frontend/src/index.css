@@ -1,9 +1,42 @@
 @import 'tailwindcss';
 
+@theme {
+  /* text */
+  --color-ink: var(--color-zinc-100); /* primary text */
+  --color-muted: var(--color-zinc-400); /* secondary/helper text */
+  --color-dim: var(--color-zinc-500); /* disabled/least-important text */
+
+  /* backgrounds */
+  --color-shell: var(--color-zinc-950); /* page/root background */
+  --color-panel: var(--color-zinc-900); /* nav header, auth card container */
+  --color-surface: var(--color-zinc-800); /* card/sidebar background */
+  --color-raised: var(--color-zinc-700); /* hover backgrounds, subtle pills */
+
+  /* borders */
+  --color-line: var(--color-zinc-800); /* default border/divider */
+  --color-line-hover: var(--color-zinc-700); /* hover/emphasis border */
+
+  /* primary accent (olive) */
+  --color-accent: var(--color-olive-500); /* buttons, focus ring, active state */
+  --color-accent-light: var(--color-olive-400); /* accent text/links, button hover bg, tints */
+  --color-accent-lighter: var(--color-olive-300); /* accent text hover state */
+
+  /* secondary accent (violet) */
+  --color-accent-secondary: var(--color-mauve-500);
+  --color-accent-secondary-hover: var(--color-mauve-400);
+
+  /* semantic status */
+  --color-success: var(--color-emerald-400);
+  --color-warning: var(--color-amber-400);
+  --color-warning-light: var(--color-amber-300);
+  --color-danger: var(--color-rose-400);
+  --color-danger-light: var(--color-rose-300);
+}
+
 @layer base {
   html,
   body,
   #root {
-    @apply bg-zinc-950 text-zinc-100;
+    @apply bg-shell text-ink;
   }
 }

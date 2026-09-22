@@ -5,7 +5,7 @@ export default function FieldErrors({ field }: { field: AnyFieldApi }) {
   if (!field.state.meta.isTouched) return null;
 
   return (
-    <p role="alert" className="mt-1 text-xs text-rose-400">
+    <p role="alert" className="mt-1 text-xs text-danger">
       {field.state.meta.errors
         .map((e) => (typeof e === 'string' ? e : e?.message))
         .filter(Boolean)

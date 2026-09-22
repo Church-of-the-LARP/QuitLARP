@@ -17,8 +17,11 @@ import Users from "./pages/Users.tsx";
 import Create from "./pages/Create.tsx";
 import AssessmentGit from "./pages/AssessmentGit.tsx";
 import Layout from "./components/Layout.tsx";
+import LandingLayout from "./components/LandingLayout.tsx";
 import { AuthProvider } from "./scripts/useAuth.tsx";
 import "./index.css";
+import Pricing from "./pages/Pricing.tsx";
+import Landing from "./pages/Landing.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -29,12 +32,16 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route element={<LandingLayout />}>
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/" element={<Landing />} />
+            </Route>
           </Route>
           <Route path="/reset-password" element={<ResetPassword />} />
 
           <Route element={<SecuredRoute />}>
             <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/create" element={<Create />} />
               <Route path="/assessments/:id/git" element={<AssessmentGit />} />
               <Route element={<SecuredRoute roles={["admin", "superadmin"]} />}>
