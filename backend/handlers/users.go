@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"backend/auth"
 	"backend/database"
 	"backend/models"
 )
@@ -24,6 +25,16 @@ type UpdateUserRoleInput struct {
 	ID   int64 `path:"id" example:"1" doc:"User id to change"`
 	Body struct {
 		Role models.Role `json:"role" enum:"user,admin,superadmin" doc:"New role"`
+	}
+}
+
+// UpdateMeInput is the request of PATCH /api/v1/users/me.
+type UpdateMeInput struct {
+	Body struct {
+		Username        string `json:"username,omitempty"`
+		Email           string `json:"email,omitempty"`
+		CurrentPassword string `json:"currentPassword,omitempty"`
+		NewPassword     string `json:"newPassword,omitempty"`
 	}
 }
 
@@ -92,6 +103,102 @@ func (h *Handlers) registerUsers(api huma.API) {
 		if err != nil {
 			log.Printf("update role re-read: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not update role")
+		}
+		out := &UserOutput{}
+		out.Body.User = updated
+		return out, nil
+	})
+
+	// PATCH /api/v1/users/me — signed-in user may update username, email or password.
+	huma.Register(api, huma.Operation{
+		OperationID: "updateMe",
+		Method:      http.MethodPatch,
+		Path:        "/api/v1/users/me",
+		Summary:     "Update the signed-in user's profile",
+	}, func(ctx context.Context, input *UpdateMeInput) (*UserOutput, error) {
+		u, err := h.requireUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		if username := strings.TrimSpace(input.Body.Username); username != "" {
+			if err := auth.ValidateUsername(username); err != nil {
+				return nil, huma.NewError(http.StatusUnprocessableEntity, err.Error())
+			}
+			taken, err := database.UsernameTaken(ctx, h.db, username)
+			if err != nil {
+				log.Printf("update me username check: %v", err)
+				return nil, huma.NewError(http.StatusInternalServerError, "could not update profile")
+			}
+			if taken && !strings.EqualFold(username, u.Username) {
+				return nil, huma.NewError(http.StatusConflict, "that username is already taken")
+			}
+			if err := database.UpdateUserUsername(ctx, h.db, u.ID, username); err != nil {
+				log.Printf("update me username: %v", err)
+				return nil, huma.NewError(http.StatusInternalServerError, "could not update username")
+			}
+			u.Username = username
+		}
+
+		if email := strings.TrimSpace(input.Body.Email); email != "" {
+			email = strings.ToLower(email)
+			if !validEmail(email) {
+				return nil, huma.NewError(http.StatusUnprocessableEntity, auth.ErrInvalidEmail.Error())
+			}
+			if !strings.EqualFold(email, u.Email) {
+				if _, err := database.GetUserByEmail(ctx, h.db, email); err == nil {
+					return nil, huma.NewError(http.StatusConflict, "that email is already registered")
+				} else if err != database.ErrNotFound {
+					log.Printf("update me email lookup: %v", err)
+					return nil, huma.NewError(http.StatusInternalServerError, "could not update email")
+				}
+				if err := database.UpdateUserEmail(ctx, h.db, u.ID, email); err != nil {
+					log.Printf("update me email: %v", err)
+					return nil, huma.NewError(http.StatusInternalServerError, "could not update email")
+				}
+				if err := database.SetEmailVerified(ctx, h.db, u.ID, false); err != nil {
+					log.Printf("update me email verification flag: %v", err)
+					return nil, huma.NewError(http.StatusInternalServerError, "could not update email")
+				}
+				u.Email = email
+				u.EmailVerified = false
+				if err := h.sendVerificationEmail(ctx, u); err != nil {
+					log.Printf("update me verification mail: %v", err)
+					return nil, huma.NewError(http.StatusInternalServerError, "could not send verification email")
+				}
+			}
+		}
+
+		if input.Body.NewPassword != "" {
+			if input.Body.CurrentPassword == "" {
+				return nil, huma.NewError(http.StatusUnprocessableEntity, "current password is required")
+			}
+			row, err := database.GetUserWithPassword(ctx, h.db, u.Email)
+			if err != nil {
+				log.Printf("update me password lookup: %v", err)
+				return nil, huma.NewError(http.StatusInternalServerError, "could not update password")
+			}
+			if row.PasswordHash == nil || !auth.CheckPassword(*row.PasswordHash, input.Body.CurrentPassword) {
+				return nil, huma.NewError(http.StatusUnauthorized, "current password is incorrect")
+			}
+			if err := auth.ValidatePassword(input.Body.NewPassword); err != nil {
+				return nil, huma.NewError(http.StatusUnprocessableEntity, err.Error())
+			}
+			hash, err := auth.HashPassword(input.Body.NewPassword)
+			if err != nil {
+				log.Printf("update me hash: %v", err)
+				return nil, huma.NewError(http.StatusInternalServerError, "could not secure password")
+			}
+			if err := database.SetPasswordHash(ctx, h.db, u.ID, hash); err != nil {
+				log.Printf("update me password: %v", err)
+				return nil, huma.NewError(http.StatusInternalServerError, "could not update password")
+			}
+		}
+
+		updated, err := database.GetUserByID(ctx, h.db, u.ID)
+		if err != nil {
+			log.Printf("update me re-read: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "could not update profile")
 		}
 		out := &UserOutput{}
 		out.Body.User = updated

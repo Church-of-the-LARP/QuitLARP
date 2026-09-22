@@ -91,6 +91,22 @@ func SetUserRole(ctx context.Context, db *sqlx.DB, id int64, role models.Role) e
 	return nil
 }
 
+// UpdateUserUsername updates a signed-in user's username.
+func UpdateUserUsername(ctx context.Context, db *sqlx.DB, id int64, username string) error {
+	_, err := db.ExecContext(ctx,
+		"UPDATE users SET username = $1, updated_at = NOW() WHERE id = $2",
+		username, id)
+	return err
+}
+
+// UpdateUserEmail updates a signed-in user's email and leaves verification to be reset elsewhere.
+func UpdateUserEmail(ctx context.Context, db *sqlx.DB, id int64, email string) error {
+	_, err := db.ExecContext(ctx,
+		"UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2",
+		email, id)
+	return err
+}
+
 // SetPasswordHash replaces the stored password hash (reset-password flow).
 func SetPasswordHash(ctx context.Context, db *sqlx.DB, id int64, hash string) error {
 	_, err := db.ExecContext(ctx,
