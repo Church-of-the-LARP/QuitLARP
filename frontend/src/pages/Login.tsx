@@ -7,6 +7,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import useAuth from '../scripts/useAuth.tsx';
 import { apiUrl } from '../scripts/api.ts';
 import type { ActionResult } from '../types/types.ts';
+import usePageTitle from '../scripts/usePageTitle.ts';
 
 const schema = z.object({
   email: z.email('Enter a valid email'),
@@ -14,6 +15,7 @@ const schema = z.object({
 });
 
 function App() {
+  usePageTitle('Log in');
   const googleUrl = `${apiUrl}/api/v1/auth/google`;
   const { loginUser } = useAuth();
   const location = useLocation();

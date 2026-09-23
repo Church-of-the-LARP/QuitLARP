@@ -6,6 +6,7 @@ import TextField from '../components/TextField.tsx';
 import { Link, useSearchParams } from 'react-router-dom';
 import client, { getErrorText } from '../scripts/api.ts';
 import type { AlertMessage } from '../types/types.ts';
+import usePageTitle from '../scripts/usePageTitle.ts';
 
 const schema = z
   .object({
@@ -18,6 +19,7 @@ const schema = z
   });
 
 function App() {
+  usePageTitle('Reset password');
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
   const [alertMsg, setAlertMsg] = useState<AlertMessage | null>(null);

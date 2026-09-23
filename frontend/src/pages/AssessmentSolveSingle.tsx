@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import Markdown from "react-markdown";
+import usePageTitle from "../scripts/usePageTitle.ts";
 
 type TestResult = {
   name: string;
@@ -42,6 +43,7 @@ Explanation: nums[0] + nums[1] equals 2 + 7 = 9, so we return indices 0 and 1.`,
 
 export default function AssessmentSolveSingle() {
   const assessment = mockAssessment;
+  usePageTitle(`Solve: ${assessment.title}`);
   const [btn, setBtn] = useState("Chapter desc");
   const [asideWidth, setAsideWidth] = useState(460);
   const containerRef = useRef<HTMLDivElement>(null);

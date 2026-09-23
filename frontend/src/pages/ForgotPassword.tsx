@@ -5,12 +5,14 @@ import Alert from '../components/Alert.tsx';
 import TextField from '../components/TextField.tsx';
 import { Link, useNavigate } from 'react-router-dom';
 import client, { getErrorText } from '../scripts/api.ts';
+import usePageTitle from '../scripts/usePageTitle.ts';
 
 const schema = z.object({
   email: z.email('Enter a valid email'),
 });
 
 function App() {
+  usePageTitle('Forgot password');
   const navigate = useNavigate();
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
 

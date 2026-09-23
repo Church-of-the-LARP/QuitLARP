@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import Logo from "./Logo.tsx";
 
 type NavbarProps = {
   user: {
@@ -16,8 +17,8 @@ export default function Navbar({ user, isAdmin, roleStyles, handleLogout }: Navb
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-[75vw] items-center justify-between py-3">
         <div className="flex items-center gap-4">
-          <Link to="/" className="text-sm font-semibold text-ink">
-            QuitLARP
+          <Link to="/" className="text-ink">
+            <Logo className="h-6 w-auto" />
           </Link>
           {isAdmin && (
             <Link

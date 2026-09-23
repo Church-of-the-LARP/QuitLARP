@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import useAuth from '../scripts/useAuth.tsx';
 import { apiUrl } from '../scripts/api.ts';
 import type { ActionResult } from '../types/types.ts';
+import usePageTitle from '../scripts/usePageTitle.ts';
 
 const schema = z.object({
   username: z
@@ -19,6 +20,7 @@ const schema = z.object({
 });
 
 function App() {
+  usePageTitle('Sign up');
   const googleUrl = `${apiUrl}/api/v1/auth/google`;
   const { registerUser } = useAuth();
   const [alertMsg, setAlertMsg] = useState<ActionResult>({});

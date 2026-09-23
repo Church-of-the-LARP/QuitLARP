@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
+import Logo from "./Logo.tsx";
 
 export default function LandingNavbar() {
   return (
     <header className="relative z-20 border-b border-line bg-panel shadow-lg shadow-black/30">
       <div className="mx-auto flex w-[75vw] items-center justify-between py-3">
-        <Link to="/" className="text-sm font-semibold text-ink">
-          QuitLARP
+        <Link to="/" className="text-ink">
+          <Logo className="h-6 w-auto" />
         </Link>
         <div className="flex items-center gap-6">
           <Link

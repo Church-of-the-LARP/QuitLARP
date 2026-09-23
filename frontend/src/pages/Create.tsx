@@ -5,6 +5,7 @@ import { z } from 'zod';
 import client, { getErrorText } from '../scripts/api';
 import Alert from '../components/Alert.tsx';
 import FieldErrors from '../components/FieldErrors.tsx';
+import usePageTitle from '../scripts/usePageTitle.ts';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -99,6 +100,7 @@ const chapterInputClass =
   'w-full rounded-xl border border-line-hover bg-surface px-3 py-2 text-ink outline-none placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30';
 
 export default function Create() {
+  usePageTitle('Create assessment');
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [repoUrl, setRepoUrl] = useState<string | null>(null);
   const [repoForId, setRepoForId] = useState<number | null>(null);
