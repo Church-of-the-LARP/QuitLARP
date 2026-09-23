@@ -8,6 +8,7 @@ import type {
   Role,
   User,
 } from '../types/types.ts';
+import usePageTitle from '../scripts/usePageTitle.ts';
 
 const roleStyles: Record<Role, string> = {
   user: 'bg-raised text-muted',
@@ -44,6 +45,7 @@ function VerifyEmailBanner() {
 }
 
 function App() {
+  usePageTitle('Users');
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const isSuperadmin = user?.role === 'superadmin';

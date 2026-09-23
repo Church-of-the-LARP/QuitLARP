@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import client, { getErrorText } from '../scripts/api';
+import client, { getErrorText } from '../scripts/api.ts';
 import Alert from '../components/Alert.tsx';
+import usePageTitle from '../scripts/usePageTitle.ts';
 
 const inputClass =
   'w-full rounded-xl border border-line-hover bg-panel px-3 py-2 text-ink outline-none placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30';
@@ -14,6 +15,7 @@ type RepoState = {
 };
 
 export default function Create() {
+  usePageTitle('Create assessment');
   const [title, setTitle] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);

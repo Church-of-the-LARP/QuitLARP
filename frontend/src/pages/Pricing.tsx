@@ -1,6 +1,9 @@
 import DesertScene from "../components/DesertScene";
+import usePageTitle from "../scripts/usePageTitle.ts";
 
 export default function Pricing() {
+  usePageTitle("Pricing");
+
   return (
     <div className="relative flex flex-col bg-panel items-center flex-1 py-20 px-4 sm:px-6 lg:px-8">
       <DesertScene />

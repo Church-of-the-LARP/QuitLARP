@@ -23,6 +23,7 @@ import "./index.css";
 import Pricing from "./pages/Pricing.tsx";
 import Landing from "./pages/Landing.tsx";
 import AssessmentPreview from "./pages/AssessmentPreview.tsx";
+import AssessmentSolveSingle from "./pages/AssessmentSolveSingle.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -46,6 +47,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/create" element={<Create />} />
               <Route path="/assessments/:id/git" element={<AssessmentGit />} />
               <Route path="/assessments/:id/preview" element={<AssessmentPreview />} />
+              <Route path="/assessments/solve/" element={<AssessmentSolveSingle />} />
               <Route element={<SecuredRoute roles={["admin", "superadmin"]} />}>
                 <Route path="/users" element={<Users />} />
               </Route>

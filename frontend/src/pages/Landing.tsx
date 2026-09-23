@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import usePageTitle from "../scripts/usePageTitle.ts";
 
 const features = [
   {
@@ -55,6 +56,8 @@ const steps = [
 ];
 
 export default function Landing() {
+  usePageTitle();
+
   return (
     <div className="mx-auto w-[75vw] py-20">
       <section className="flex flex-col items-center text-center">

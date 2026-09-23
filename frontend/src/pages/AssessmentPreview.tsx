@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import client, { getErrorText } from "../scripts/api";
 import useAuth from "../scripts/useAuth.tsx";
 import type { components } from "../api/schema.ts";
+import usePageTitle from "../scripts/usePageTitle.ts";
 
 type Assessment = components["schemas"]["Assessment"];
 type Chapter = components["schemas"]["Chapter"];
@@ -29,6 +30,8 @@ export default function AssessmentPreview() {
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  usePageTitle(assessment ? `Preview: ${assessment.title}` : undefined);
 
   useEffect(() => {
     if (!Number.isInteger(id) || id <= 0) {
