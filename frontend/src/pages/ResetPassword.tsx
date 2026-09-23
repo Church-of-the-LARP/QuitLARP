@@ -7,6 +7,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import client, { getErrorText } from '../scripts/api.ts';
 import type { AlertMessage } from '../types/types.ts';
 import usePageTitle from '../scripts/usePageTitle.ts';
+import Logo from '../components/Logo.tsx';
 
 const schema = z
   .object({
@@ -56,8 +57,8 @@ function App() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-shell px-6">
       <div className="w-126 max-w-sm rounded-xl border border-line bg-panel p-8 shadow-sm">
-        <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-ink">
-          QuitLARP
+        <div className="mb-6 flex items-center justify-center gap-2">
+          <Logo className="h-6 w-auto" />
         </div>
         <h1 className="text-2xl font-semibold text-ink">Reset your password</h1>
         <p className="mt-1 text-sm text-muted">
