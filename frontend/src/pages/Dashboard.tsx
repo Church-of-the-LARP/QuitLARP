@@ -2,6 +2,7 @@ import { useState } from "react";
 import Alert from "../components/Alert.tsx";
 import useAuth from "../scripts/useAuth.tsx";
 import type { ActionResult } from "../types/types.ts";
+import usePageTitle from "../scripts/usePageTitle.ts";
 
 const upcomingTests = [
   { title: "Intro to LARP Safety", date: "Today, 18:00", questions: 12 },
@@ -102,6 +103,7 @@ function VerifyEmailBanner({
 }
 
 function App() {
+  usePageTitle("Dashboard");
   const { user } = useAuth();
   const [closeEmail, setCloseEmail] = useState(false);
   const [filter, setFilter] = useState("");

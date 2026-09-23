@@ -7,6 +7,8 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import useAuth from '../scripts/useAuth.tsx';
 import { apiUrl } from '../scripts/api.ts';
 import type { ActionResult } from '../types/types.ts';
+import usePageTitle from '../scripts/usePageTitle.ts';
+import Logo from '../components/Logo.tsx';
 
 const schema = z.object({
   email: z.email('Enter a valid email'),
@@ -14,6 +16,7 @@ const schema = z.object({
 });
 
 function App() {
+  usePageTitle('Log in');
   const googleUrl = `${apiUrl}/api/v1/auth/google`;
   const { loginUser } = useAuth();
   const location = useLocation();
@@ -55,8 +58,8 @@ function App() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-shell px-6">
       <div className="w-126 rounded-xl border border-line bg-panel p-8 shadow-sm">
-        <div className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-ink">
-          QuitLARP
+        <div className="mb-6 flex items-center justify-center gap-2">
+          <Logo className="h-6 w-auto" />
         </div>
         <div className="mx-auto w-full max-w-sm">
           <h1 className="text-2xl font-semibold text-ink">Sign in</h1>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import client, { getErrorText } from '../scripts/api';
+import usePageTitle from '../scripts/usePageTitle.ts';
 
 type Entry = {
   name: string;
@@ -26,6 +27,7 @@ const formatSize = (bytes: number) => {
 };
 
 export default function AssessmentGit() {
+  usePageTitle('Assessment files');
   const params = useParams();
   const id = Number(params.id);
 

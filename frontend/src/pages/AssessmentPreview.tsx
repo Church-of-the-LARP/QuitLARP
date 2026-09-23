@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { components } from "../api/schema.ts";
+import usePageTitle from "../scripts/usePageTitle.ts";
 
 type Assessment = components["schemas"]["Assessment"];
 type Chapter = components["schemas"]["Chapter"];
@@ -76,6 +77,7 @@ const formatDate = (value: string) =>
 
 export default function AssessmentPreview() {
   const assessment = mockAssessment;
+  usePageTitle(`Preview: ${assessment.title}`);
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
 
   const chapters = [...(assessment.chapters ?? [])].sort(
