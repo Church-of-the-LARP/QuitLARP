@@ -82,6 +82,7 @@ type Chapter struct {
 	Title            string    `json:"title" db:"title" doc:"Chapter title"`
 	Description      string    `json:"description" db:"description" doc:"Chapter body text"`
 	TimeLimitMinutes int       `json:"timeLimitMinutes" db:"time_limit_minutes" example:"30" doc:"Time limit for this chapter, in minutes"`
+	StartMode        string    `json:"startMode" db:"start_mode" doc:"How the chapter starts: a clean file, or continued from the previous chapter"`
 	CreatedAt        time.Time `json:"createdAt" db:"created_at" doc:"Creation time"`
 	UpdatedAt        time.Time `json:"updatedAt" db:"updated_at" doc:"Last modification time"`
 }

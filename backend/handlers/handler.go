@@ -5,6 +5,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log"
@@ -15,6 +17,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jmoiron/sqlx"
 
+	"backend/assessment"
 	"backend/auth"
 	"backend/config"
 	"backend/database"
@@ -23,6 +26,10 @@ import (
 	"backend/models"
 )
 
+// pushSecretBytes is the length of the per-boot secret the git update hook
+// uses to authenticate its push-validation callback.
+const pushSecretBytes = 16
+
 // Handlers carries the shared dependencies for every endpoint.
 type Handlers struct {
 	db     *sqlx.DB
@@ -30,12 +37,42 @@ type Handlers struct {
 	mail   mailer.Mailer
 	tokens *auth.Auth
 	google *auth.GoogleClient
+
+	// generator produces the UFT glue that the push gate checks a chapter
+	// against; the git plumbing reads both fields.
+	generator  assessment.Generator
+	pushSecret string
 }
 
 // New builds the handler bundle.
 func New(db *sqlx.DB, cfg *config.Config, mail mailer.Mailer,
 	tokens *auth.Auth, google *auth.GoogleClient) *Handlers {
-	return &Handlers{db: db, cfg: cfg, mail: mail, tokens: tokens, google: google}
+	buf := make([]byte, pushSecretBytes)
+	if _, err := rand.Read(buf); err != nil {
+		log.Fatalf("push validation: generate callback secret: %v", err)
+	}
+
+	if cfg.Validation.GenerateCommand == "" {
+		log.Printf("push validation: generation gate disabled (VALIDATION_GENERATE_COMMAND is empty)")
+	} else {
+		log.Printf("push validation: generate command %q (timeout %s)",
+			cfg.Validation.GenerateCommand, cfg.Validation.GenerateTimeout)
+	}
+
+	gen := &assessment.CommandGenerator{
+		Command: cfg.Validation.GenerateCommand,
+		Timeout: cfg.Validation.GenerateTimeout,
+	}
+
+	return &Handlers{
+		db:         db,
+		cfg:        cfg,
+		mail:       mail,
+		tokens:     tokens,
+		google:     google,
+		generator:  gen,
+		pushSecret: hex.EncodeToString(buf),
+	}
 }
 
 // Register mounts every huma operation on the API.

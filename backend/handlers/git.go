@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -24,6 +25,51 @@ const (
 	gitUploadPack  = "git-upload-pack"
 	gitReceivePack = "git-receive-pack"
 )
+
+// pushHook is installed as hooks/update in every assessment repository. It
+// asks the backend to validate a push before the main ref moves; updates of
+// any other ref pass straight through. The client sees rejections as remote
+// lines, exactly like a server-side pre-receive hook.
+const pushHook = `#!/bin/sh
+# Installed by the backend. Updates of main are validated before the ref moves;
+# other refs pass through. Rejections reach the client as remote lines.
+ref="$1"
+old="$2"
+new="$3"
+
+[ "$ref" = "refs/heads/main" ] || exit 0
+
+if [ "$new" = "0000000000000000000000000000000000000000" ]; then
+	echo "main cannot be deleted" >&2
+	exit 1
+fi
+
+if [ -z "$PUSH_VALIDATION_URL" ] || [ -z "$PUSH_VALIDATION_SECRET" ]; then
+	echo "push validation is not configured; refusing to update main" >&2
+	exit 1
+fi
+
+result=$(
+	printf 'repository=%s\nref=%s\nold=%s\nnew=%s\nquarantine=%s\n' \
+		"$PUSH_REPOSITORY_ID" "$ref" "$old" "$new" "$GIT_QUARANTINE_PATH" |
+	curl -sS -m 1800 -w 'HTTP_STATUS:%{http_code}' \
+		-H "X-Push-Validation: $PUSH_VALIDATION_SECRET" \
+		--data-binary @- "$PUSH_VALIDATION_URL"
+) || {
+	echo "push validation is unavailable; try again later" >&2
+	exit 1
+}
+
+status=${result##*HTTP_STATUS:}
+body=${result%HTTP_STATUS:*}
+
+if [ "$status" != "200" ]; then
+	printf '%s\n' "$body" >&2
+	exit 1
+fi
+
+exit 0
+`
 
 var repoPathPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(/[A-Za-z0-9][A-Za-z0-9._-]{0,63})*$`)
 
@@ -62,7 +108,8 @@ func (h *Handlers) gitUser(w http.ResponseWriter, r *http.Request) (models.User,
 // gitInfoRefs answers GET .../info/refs: the ref advertisement that starts
 // every fetch and push.
 func (h *Handlers) gitInfoRefs(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.gitUser(w, r); !ok {
+	u, ok := h.gitUser(w, r)
+	if !ok {
 		return
 	}
 
@@ -76,6 +123,13 @@ func (h *Handlers) gitInfoRefs(w http.ResponseWriter, r *http.Request) {
 	if service != gitUploadPack && service != gitReceivePack {
 		http.Error(w, "only the smart HTTP protocol is supported", http.StatusForbidden)
 		return
+	}
+
+	if id, ok := parseAssessmentRepoID(repoID); ok {
+		if err := h.authorizeAssessmentRepo(r.Context(), u, id); err != nil {
+			writeAssessmentRepoFailure(w, err)
+			return
+		}
 	}
 
 	dir, err := h.gitRepoDir(repoID)
@@ -117,8 +171,16 @@ func (h *Handlers) gitRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, ok := h.gitUser(w, r); !ok {
+	u, ok := h.gitUser(w, r)
+	if !ok {
 		return
+	}
+
+	if id, ok := parseAssessmentRepoID(repoID); ok {
+		if err := h.authorizeAssessmentRepo(r.Context(), u, id); err != nil {
+			writeAssessmentRepoFailure(w, err)
+			return
+		}
 	}
 
 	dir, err := h.gitRepoDir(repoID)
@@ -129,6 +191,13 @@ func (h *Handlers) gitRPC(w http.ResponseWriter, r *http.Request) {
 
 	cmd := exec.CommandContext(r.Context(), "git", gitCommandName(service), "--stateless-rpc", dir)
 	cmd.Env = append(os.Environ(), gitProtocolEnv(r)...)
+	if service == gitReceivePack {
+		cmd.Env = append(cmd.Env,
+			"PUSH_VALIDATION_URL=http://127.0.0.1:"+h.cfg.Port+"/internal/push-validation",
+			"PUSH_VALIDATION_SECRET="+h.pushSecret,
+			"PUSH_REPOSITORY_ID="+repoID,
+		)
+	}
 	cmd.Stdin = r.Body
 	defer r.Body.Close()
 	var stderr bytes.Buffer
@@ -157,6 +226,7 @@ func (h *Handlers) gitRPC(w http.ResponseWriter, r *http.Request) {
 	}
 	if service == gitReceivePack {
 		gitAlignHead(dir)
+		go h.syncAssessmentFromRepo(context.Background(), repoID)
 	}
 }
 
@@ -171,19 +241,101 @@ func (h *Handlers) gitRepoDir(repoID string) (string, error) {
 	}
 	dir := filepath.Join(h.cfg.GitReposDir, filepath.FromSlash(id+".git"))
 
-	if _, err := os.Stat(filepath.Join(dir, "HEAD")); err == nil {
-		return dir, nil
+	if _, err := os.Stat(filepath.Join(dir, "HEAD")); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
+			return "", fmt.Errorf("create repos dir: %w", err)
+		}
+		// Bare: no working tree to get in the way of pushes. HEAD starts on
+		// "main" to match what modern tooling expects.
+		out, err := exec.Command("git", "init", "--bare", "--quiet", "--initial-branch=main", dir).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("git init %s: %w: %s", dir, err, strings.TrimSpace(string(out)))
+		}
 	}
-	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
-		return "", fmt.Errorf("create repos dir: %w", err)
-	}
-	// Bare: no working tree to get in the way of pushes. HEAD starts on
-	// "main" to match what modern tooling expects.
-	out, err := exec.Command("git", "init", "--bare", "--quiet", "--initial-branch=main", dir).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git init %s: %w: %s", dir, err, strings.TrimSpace(string(out)))
+
+	if _, ok := parseAssessmentRepoID(id); ok {
+		if err := ensurePushHook(dir); err != nil {
+			return "", err
+		}
 	}
 	return dir, nil
+}
+
+// ensurePushHook keeps hooks/update of an assessment repository identical to
+// pushHook. It rewrites the file whenever the content differs, so upgrading
+// the constant takes effect on the next push.
+func ensurePushHook(dir string) error {
+	path := filepath.Join(dir, "hooks", "update")
+	if current, err := os.ReadFile(path); err == nil && string(current) == pushHook {
+		return os.Chmod(path, 0o755)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("install push hook in %s: %w", dir, err)
+	}
+	if err := os.WriteFile(path, []byte(pushHook), 0o755); err != nil {
+		return fmt.Errorf("install push hook in %s: %w", dir, err)
+	}
+	return nil
+}
+
+// parseAssessmentRepoID recognises the repository name that backs an
+// assessment ("assessments/assessment-<id>", with an optional ".git" suffix)
+// and returns the assessment id it encodes.
+func parseAssessmentRepoID(repoID string) (int64, bool) {
+	rest, ok := strings.CutPrefix(strings.TrimSuffix(repoID, ".git"), "assessments/assessment-")
+	if !ok || rest == "" || (len(rest) > 1 && rest[0] == '0') {
+		return 0, false
+	}
+	for _, c := range rest {
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+	}
+	id, err := strconv.ParseInt(rest, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
+}
+
+// errNoAssessmentRepo is the sentinel for a repository with no assessment
+// behind it.
+var errNoAssessmentRepo = errors.New("no assessment backs this repository")
+
+// errAssessmentRepoForbidden is the sentinel for a caller who may not use an
+// assessment repository.
+var errAssessmentRepoForbidden = errors.New("forbidden")
+
+// authorizeAssessmentRepo allows the author of an assessment, or an
+// admin/superadmin, to use its repository. Everything else, including an
+// assessment id with no row behind it, is refused so a push cannot lazily
+// create a repository for an assessment that does not exist.
+func (h *Handlers) authorizeAssessmentRepo(ctx context.Context, u models.User, id int64) error {
+	authorID, err := database.GetAssessmentAuthorID(ctx, h.db, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return errNoAssessmentRepo
+		}
+		return fmt.Errorf("assessment author lookup: %w", err)
+	}
+	if (authorID != nil && *authorID == u.ID) ||
+		u.Role == models.RoleAdmin || u.Role == models.RoleSuperadmin {
+		return nil
+	}
+	return errAssessmentRepoForbidden
+}
+
+// writeAssessmentRepoFailure turns an authorization failure into a response.
+func writeAssessmentRepoFailure(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, errNoAssessmentRepo):
+		writeProblem(w, http.StatusNotFound, "no assessment backs this repository")
+	case errors.Is(err, errAssessmentRepoForbidden):
+		writeProblem(w, http.StatusForbidden, "you do not have permission to use this repository")
+	default:
+		log.Printf("assessment repository authorization: %v", err)
+		writeProblem(w, http.StatusInternalServerError, "git service unavailable")
+	}
 }
 
 // gitAlignHead points HEAD at the repository's only branch when HEAD does not

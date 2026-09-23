@@ -3,11 +3,13 @@ package database
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 
+	"backend/assessment"
 	"backend/models"
 )
 
@@ -213,7 +215,7 @@ func GetAssessmentDetail(ctx context.Context, db *sqlx.DB, id int64) (models.Ass
 
 	if err := db.SelectContext(ctx, &got.Chapters, `
 		SELECT id, assessment_id, position, title, description,
-		       time_limit_minutes, created_at, updated_at
+		       time_limit_minutes, start_mode, created_at, updated_at
 		FROM chapters WHERE assessment_id = $1 ORDER BY position, id`, id); err != nil {
 		return models.Assessment{}, err
 	}
@@ -362,4 +364,114 @@ func DeleteAssessment(ctx context.Context, db *sqlx.DB, id int64) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// defaultChapterTimeLimitMinutes is the limit new repository-synced chapters
+// get: the repository format carries no time limit yet, so new chapters take
+// the platform default while existing values stay untouched.
+const defaultChapterTimeLimitMinutes = 30
+
+// GetAssessmentMainCommit returns the main commit sha the assessment was last
+// synced from; "" when it was never synced. ErrNotFound when the assessment
+// does not exist.
+func GetAssessmentMainCommit(ctx context.Context, db *sqlx.DB, id int64) (string, error) {
+	var commit *string
+	err := db.GetContext(ctx, &commit, "SELECT main_commit FROM assessments WHERE id = $1", id)
+	if err != nil {
+		return "", mapNotFound(err)
+	}
+	if commit == nil {
+		return "", nil
+	}
+	return *commit, nil
+}
+
+// SyncAssessmentContent replaces the repository-derived content of an
+// assessment: description, chapters (matched by position) and the sync
+// bookkeeping. Manually managed fields (title, difficulty, time limit, tags,
+// tests, template) are untouched. Runs in one transaction.
+func SyncAssessmentContent(ctx context.Context, db *sqlx.DB, id int64, content assessment.Content, mainCommit string) error {
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin sync of assessment %d: %w", id, err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `
+		UPDATE assessments
+		SET description = $2, main_commit = $3, synced_at = NOW()
+		WHERE id = $1`, id, content.Description, mainCommit)
+	if err != nil {
+		return fmt.Errorf("sync assessment %d: %w", id, err)
+	}
+	if affected, _ := res.RowsAffected(); affected == 0 {
+		return ErrNotFound
+	}
+
+	existing, err := chapterIDsByPosition(ctx, tx, id)
+	if err != nil {
+		return fmt.Errorf("load chapters of assessment %d: %w", id, err)
+	}
+
+	chapters := make([]assessment.Chapter, len(content.Chapters))
+	copy(chapters, content.Chapters)
+	sort.SliceStable(chapters, func(i, j int) bool { return chapters[i].Index < chapters[j].Index })
+
+	kept := map[int]bool{}
+	for _, ch := range chapters {
+		kept[ch.Index] = true
+		if _, ok := existing[ch.Index]; ok {
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE chapters
+				SET title = $2, description = $3, start_mode = $4
+				WHERE assessment_id = $1 AND position = $5`,
+				id, ch.Name, ch.Readme, ch.Start, ch.Index); err != nil {
+				return fmt.Errorf("update chapter at position %d of assessment %d: %w", ch.Index, id, err)
+			}
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO chapters (assessment_id, position, title, description,
+			                      start_mode, time_limit_minutes)
+			VALUES ($1, $2, $3, $4, $5, $6)`,
+			id, ch.Index, ch.Name, ch.Readme, ch.Start, defaultChapterTimeLimitMinutes); err != nil {
+			return fmt.Errorf("insert chapter at position %d of assessment %d: %w", ch.Index, id, err)
+		}
+	}
+
+	stale := []int64{}
+	for position, chapterID := range existing {
+		if !kept[position] {
+			stale = append(stale, chapterID)
+		}
+	}
+	if len(stale) > 0 {
+		if _, err := tx.ExecContext(ctx,
+			"DELETE FROM chapters WHERE assessment_id = $1 AND id = ANY($2)", id, stale); err != nil {
+			return fmt.Errorf("delete stale chapters of assessment %d: %w", id, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit sync of assessment %d: %w", id, err)
+	}
+	return nil
+}
+
+// chapterIDsByPosition maps the position of each existing chapter of an
+// assessment to its id.
+func chapterIDsByPosition(ctx context.Context, q dbtx, assessmentID int64) (map[int]int64, error) {
+	rows := []struct {
+		ID       int64 `db:"id"`
+		Position int   `db:"position"`
+	}{}
+	if err := q.SelectContext(ctx, &rows,
+		"SELECT id, position FROM chapters WHERE assessment_id = $1", assessmentID); err != nil {
+		return nil, err
+	}
+	out := make(map[int]int64, len(rows))
+	for _, r := range rows {
+		out[r.Position] = r.ID
+	}
+	return out, nil
 }
