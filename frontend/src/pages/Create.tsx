@@ -1,97 +1,9 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import client, { getErrorText } from '../scripts/api';
+import client, { getErrorText } from '../scripts/api.ts';
 import Alert from '../components/Alert.tsx';
-import FieldErrors from '../components/FieldErrors.tsx';
 import usePageTitle from '../scripts/usePageTitle.ts';
-
-type Difficulty = 'easy' | 'medium' | 'hard';
-
-const chapterSchema = z.object({
-  number: z.number(),
-  title: z.string(),
-  description: z.string(),
-  timeLimitMinutes: z.string(),
-});
-
-const schema = z
-  .object({
-    title: z.string(),
-    description: z.string(),
-    difficulty: z.enum(['easy', 'medium', 'hard']),
-    timeLimitMinutes: z.string(),
-    templateFileName: z.string(),
-    tags: z.string(),
-    templateContent: z.string(),
-    chapters: z.array(chapterSchema),
-    testName: z.string(),
-    testFileName: z.string(),
-    testDescription: z.string(),
-    testContent: z.string(),
-  })
-  .superRefine((value, ctx) => {
-    if (!value.title.trim()) {
-      ctx.addIssue({ code: 'custom', message: 'Required', path: ['title'] });
-    }
-    if (!value.description.trim()) {
-      ctx.addIssue({ code: 'custom', message: 'Required', path: ['description'] });
-    }
-    if (!value.templateFileName.trim()) {
-      ctx.addIssue({ code: 'custom', message: 'Required', path: ['templateFileName'] });
-    }
-    const time = Number(value.timeLimitMinutes);
-    if (!Number.isFinite(time) || time <= 0) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Must be greater than 0',
-        path: ['timeLimitMinutes'],
-      });
-    }
-
-    value.chapters.forEach((chapter, index) => {
-      const hasAny =
-        chapter.title.trim() || chapter.description.trim() || chapter.timeLimitMinutes.trim();
-      if (!hasAny) return;
-
-      if (!chapter.title.trim()) {
-        ctx.addIssue({ code: 'custom', message: 'Required', path: ['chapters', index, 'title'] });
-      }
-      if (!chapter.description.trim()) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Required',
-          path: ['chapters', index, 'description'],
-        });
-      }
-      const chapterTime = Number(chapter.timeLimitMinutes);
-      if (!Number.isFinite(chapterTime) || chapterTime <= 0) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Must be greater than 0',
-          path: ['chapters', index, 'timeLimitMinutes'],
-        });
-      }
-    });
-
-    const hasTestValues = !!(
-      value.testName.trim() ||
-      value.testDescription.trim() ||
-      value.testFileName.trim() ||
-      value.testContent.trim()
-    );
-    if (hasTestValues) {
-      if (!value.testName.trim()) {
-        ctx.addIssue({ code: 'custom', message: 'Required', path: ['testName'] });
-      }
-      if (!value.testDescription.trim()) {
-        ctx.addIssue({ code: 'custom', message: 'Required', path: ['testDescription'] });
-      }
-      if (!value.testFileName.trim()) {
-        ctx.addIssue({ code: 'custom', message: 'Required', path: ['testFileName'] });
-      }
-    }
-  });
 
 const inputClass =
   'w-full rounded-xl border border-line-hover bg-panel px-3 py-2 text-ink outline-none placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30';
