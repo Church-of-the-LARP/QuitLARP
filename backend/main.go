@@ -70,6 +70,9 @@ func main() {
 	// The local git server (clone/fetch/push over smart HTTP) is raw too: it
 	// streams a binary protocol and accepts its own Basic-auth credentials.
 	root.Handle("/git/", hs.GitHandler())
+	// Callback posted by the git update hook during a push: an internal
+	// endpoint, not part of the public API.
+	root.Handle("POST /internal/push-validation", hs.PushValidationHandler())
 	// CookieJar buffers huma responses so session cookies can be attached;
 	// Authenticate parses the session token (cookie or Bearer) per request.
 	root.Handle("/", middleware.CookieJar(middleware.Authenticate(tokens, apiMux)))

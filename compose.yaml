@@ -28,13 +28,21 @@ services:
       retries: 12
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      # The utf CLI for the push validation gate is built from the universal
+      # testing framework checkout; point UTF_SRC elsewhere to use another one.
+      additional_contexts:
+        utf-src: ${UTF_SRC:-../UniversalTestingFramework}
     environment:
       DATABASE_URL: postgres://app:app@db:5432/app?sslmode=disable
       # The email transport is selected by ENV/EMAIL_PROVIDER in
       # backend/.env; only the in-network Mailpit address is pinned here.
       MAILPIT_SMTP_ADDR: mailpit:1025
       MAILPIT_UI_URL: http://localhost:${MAILPIT_UI_PORT:-8025}
+      # The backend image ships the utf CLI, so the gate invokes it directly
+      # instead of going through dune the way the .env.example default does.
+      VALIDATION_GENERATE_COMMAND: utf gen python
     ports:
       - "8888:8888"
     depends_on:

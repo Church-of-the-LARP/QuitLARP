@@ -12,7 +12,7 @@ import (
 
 // chapterColumns is the SELECT list for a full chapter row.
 const chapterColumns = `id, assessment_id, position, title, description,
-	time_limit_minutes, created_at, updated_at`
+	time_limit_minutes, start_mode, created_at, updated_at`
 
 // GetChapter loads one chapter by id.
 func GetChapter(ctx context.Context, db *sqlx.DB, id int64) (models.Chapter, error) {
