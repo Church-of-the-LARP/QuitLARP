@@ -151,6 +151,13 @@ export default function Create() {
             Browse the repository
           </Link>
 
+          <Link
+            to={`/assessments/${repo.id}/preview`}
+            className="self-start text-sm font-semibold text-accent-light transition hover:text-accent-lighter"
+          >
+            View the assessment
+          </Link>
+
           <button
             type="button"
             onClick={reset}

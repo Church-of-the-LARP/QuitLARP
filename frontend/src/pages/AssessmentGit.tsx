@@ -246,6 +246,13 @@ export default function AssessmentGit() {
       <Link to="/create" className="text-sm font-semibold text-accent-light hover:text-accent-lighter">
         Create another assessment
       </Link>
+
+      <Link
+        to={`/assessments/${id}/preview`}
+        className="text-sm font-semibold text-accent-light hover:text-accent-lighter"
+      >
+        View the assessment
+      </Link>
     </main>
   );
 }

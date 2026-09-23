@@ -1,66 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import client, { getErrorText } from "../scripts/api";
+import useAuth from "../scripts/useAuth.tsx";
 import type { components } from "../api/schema.ts";
 import usePageTitle from "../scripts/usePageTitle.ts";
 
 type Assessment = components["schemas"]["Assessment"];
 type Chapter = components["schemas"]["Chapter"];
-
-type AssessmentPreviewData = Assessment & {
-  visibility: "public" | "private";
-};
-
-const mockAssessment: AssessmentPreviewData = {
-  id: 1,
-  author: { id: 7, username: "ada_instructor" },
-  chapters: [
-    {
-      id: 101,
-      assessmentId: 1,
-      title: "Two Sum",
-      description: `Input:
-An array of integers nums and an integer target.
-
-Output:
-The indices of the two numbers that add up to the target.
-
-Rules:
-Each input has exactly one solution. You cannot use the same array element twice. You can return the indices in any order.
-
-Example
-Input: nums = [2, 7, 11, 15], target = 9
-Output: [0, 1]
-Explanation: nums[0] + nums[1] equals 2 + 7 = 9, so we return indices 0 and 1.`,
-      position: 1,
-      timeLimitMinutes: 30,
-      createdAt: "2026-08-01T09:00:00Z",
-      updatedAt: "2026-08-14T15:32:00Z",
-    },
-  ],
-  createdAt: "2026-08-01T09:00:00Z",
-  description:
-    "A single-chapter warm-up assessment covering array traversal and hash-map lookups.",
-  difficulty: "easy",
-  tags: [
-    { id: 1, name: "arrays" },
-    { id: 2, name: "hash-map" },
-  ],
-  template: {
-    fileName: "solution.py",
-    content: "def two_sum(nums, target):\n    pass\n",
-  },
-  tests: [
-    {
-      id: 501,
-      name: "Two Sum",
-      description:
-        "Validates returned indices across small and large input arrays.",
-    },
-  ],
-  timeLimitMinutes: 30,
-  title: "Two Sum",
-  updatedAt: "2026-08-14T15:32:00Z",
-  visibility: "public",
-};
 
 const difficultyStyles: Record<Assessment["difficulty"], string> = {
   easy: "text-success",
@@ -76,20 +22,95 @@ const formatDate = (value: string) =>
   });
 
 export default function AssessmentPreview() {
-  const assessment = mockAssessment;
-  usePageTitle(`Preview: ${assessment.title}`);
+  const params = useParams();
+  const id = Number(params.id);
+  const { user } = useAuth();
+
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  usePageTitle(assessment ? `Preview: ${assessment.title}` : undefined);
+
+  useEffect(() => {
+    if (!Number.isInteger(id) || id <= 0) {
+      setError("This assessment id is not valid");
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setAssessment(null);
+    setActiveChapter(null);
+    client
+      .GET("/api/v1/assessments/{id}", { params: { path: { id } } })
+      .then((res) => {
+        if (!active) return;
+        if (res.error) {
+          setError(
+            res.response.status === 404
+              ? "This assessment does not exist"
+              : getErrorText(res.error, "Could not load the assessment"),
+          );
+          return;
+        }
+        const loaded = res.data?.assessment;
+        if (!loaded) {
+          setError("Could not load the assessment");
+          return;
+        }
+        setAssessment(loaded);
+      })
+      .catch(() => {
+        if (active) setError("Could not load the assessment");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center flex-1 py-20 px-4 sm:px-6 lg:px-8 w-screen">
+        <div className="flex w-full max-w-4xl justify-between items-center">
+          <p className="text-sm text-muted">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center flex-1 py-20 px-4 sm:px-6 lg:px-8 w-screen">
+        <div className="flex w-full max-w-4xl justify-between items-center">
+          <p className="text-sm text-danger">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!assessment) return null;
 
   const chapters = [...(assessment.chapters ?? [])].sort(
     (a, b) => a.position - b.position,
   );
-  const activeLabel = activeChapter ? activeChapter.title : "README.md";
+  const activeLabel = activeChapter
+    ? `chapters/${activeChapter.position}_${activeChapter.title}`
+    : "README.md";
   const activeContent = activeChapter
     ? activeChapter.description
     : assessment.description;
   const activeTimeLimit = activeChapter
     ? activeChapter.timeLimitMinutes
     : assessment.timeLimitMinutes;
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+  const isAuthor = user !== null && assessment.author?.id === user.id;
+  const showRepositoryLink = isAdmin || isAuthor;
 
   return (
     <div className="flex flex-col items-center flex-1 py-20 px-4 sm:px-6 lg:px-8 w-screen">
@@ -105,18 +126,24 @@ export default function AssessmentPreview() {
               {assessment.difficulty}
             </h1>
           </div>
-
-          <p className="text-sm uppercase tracking-wide text-muted">
-            {assessment.visibility}
-          </p>
         </div>
-        <div className="flex flex-row items-center gap-4">
-          <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
-            leaderboard & solutions
-          </button>
-          <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
-            begin practice run
-          </button>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-row items-center gap-4">
+            <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
+              leaderboard & solutions
+            </button>
+            <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
+              begin practice run
+            </button>
+          </div>
+          {showRepositoryLink && (
+            <Link
+              to={`/assessments/${id}/git`}
+              className="text-sm font-semibold text-accent-light transition hover:text-accent-lighter"
+            >
+              View repository
+            </Link>
+          )}
         </div>
       </div>
       <div className="mt-8 flex w-full max-w-4xl gap-6 bg-panel rounded-xl p-6">
@@ -149,7 +176,14 @@ export default function AssessmentPreview() {
                   type="button"
                   onClick={() => setActiveChapter(chapter)}
                 >
-                  {chapter.position}. {chapter.title}
+                  {`chapters/${chapter.position}_${chapter.title}`}
+                  {activeChapter?.id === chapter.id && (
+                    <span className="block font-normal text-xs text-dim">
+                      {chapter.startMode === "clean"
+                        ? "starts clean"
+                        : "continues the previous chapter"}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}
