@@ -23,6 +23,12 @@ const (
 	EmailProviderMailpit = "mailpit"
 	// EmailProviderResend delivers mail through the Resend API (prod).
 	EmailProviderResend = "resend"
+
+	// defaultGenerateCommand produces the UFT glue for one spec file; the
+	// spec path is appended by the caller.
+	defaultGenerateCommand = "dune exec utf -- gen python"
+	// defaultGenerateTimeout bounds one chapter's generation run.
+	defaultGenerateTimeout = 5 * time.Minute
 )
 
 // Config holds every runtime setting for the backend.
@@ -41,6 +47,17 @@ type Config struct {
 	GitReposDir    string // where the local git server keeps its bare repositories
 	Google         GoogleConfig
 	Superadmin     SuperadminConfig
+	Validation     ValidationConfig
+}
+
+// ValidationConfig controls the push-time checks that need external tooling.
+type ValidationConfig struct {
+	// GenerateCommand is the shell command that produces the UFT glue for one
+	// spec file; the file path is appended and it runs inside the chapter
+	// directory. Empty disables the generation gate.
+	GenerateCommand string
+	// GenerateTimeout bounds one chapter's generation run.
+	GenerateTimeout time.Duration
 }
 
 // GoogleConfig holds the OAuth2 client credentials for "Sign in with Google".
@@ -122,6 +139,11 @@ func Load() (*Config, error) {
 	cfg.FrontendURL = strings.TrimRight(get("FRONTEND_URL", "http://localhost:5173"), "/")
 	cfg.GitReposDir = get("GIT_REPOS_DIR", "data/git")
 
+	cfg.Validation = ValidationConfig{
+		GenerateCommand: generateCommand(),
+		GenerateTimeout: getDuration("VALIDATION_GENERATE_TIMEOUT", defaultGenerateTimeout),
+	}
+
 	cfg.Email = EmailConfig{
 		Provider:        emailProvider(cfg.Env),
 		From:            get("EMAIL_FROM", "QuitLARP <no-reply@example.com>"),
@@ -178,6 +200,34 @@ func getBool(key string, fallback bool) bool {
 		return false
 	}
 	return fallback
+}
+
+// generateCommand resolves VALIDATION_GENERATE_COMMAND. Unlike get, an
+// explicitly empty value is meaningful here: it disables the generation gate
+// so pushes can be validated without a toolchain. Only an unset variable
+// falls back to the default.
+func generateCommand() string {
+	raw, ok := os.LookupEnv("VALIDATION_GENERATE_COMMAND")
+	if !ok {
+		return defaultGenerateCommand
+	}
+	return strings.TrimSpace(raw)
+}
+
+// getDuration parses a Go duration string such as "5m" or "90s". Values that
+// do not parse fall back to the default with a warning instead of failing the
+// boot, so a typo degrades one gate rather than the whole server.
+func getDuration(key string, fallback time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("WARNING: %s=%q is not a valid duration such as 5m or 90s; using %s", key, raw, fallback)
+		return fallback
+	}
+	return d
 }
 
 func splitList(raw string) []string {
