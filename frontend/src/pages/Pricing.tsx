@@ -2,13 +2,13 @@ import DesertScene from "../components/DesertScene";
 
 export default function Pricing() {
   return (
-    <div className="relative flex flex-col items-center flex-1 py-20 px-4 sm:px-6 lg:px-8">
+    <div className="relative flex flex-col bg-panel items-center flex-1 py-20 px-4 sm:px-6 lg:px-8">
       <DesertScene />
 
-      <h1 className="relative z-10 text-5xl font-bold mb-4 text-ink [text-shadow:0_0_6px_var(--color-shell),0_0_12px_var(--color-shell),0_0_24px_var(--color-shell),0_0_40px_var(--color-shell)]">
+      <h1 className="relative z-10 text-5xl font-bold mb-4 text-ink [text-shadow:0_0_6px_var(--color-panel),0_0_12px_var(--color-panel),0_0_24px_var(--color-panel),0_0_40px_var(--color-panel)]">
         Pricing
       </h1>
-      <p className="relative z-10 text-md text-muted [text-shadow:0_0_4px_var(--color-shell),0_0_8px_var(--color-shell),0_0_16px_var(--color-shell),0_0_28px_var(--color-shell)]">
+      <p className="relative z-10 text-md text-muted [text-shadow:0_0_4px_var(--color-panel),0_0_8px_var(--color-panel),0_0_16px_var(--color-panel),0_0_28px_var(--color-panel)]">
         Choose the plan that fits your needs.
       </p>
 
@@ -33,7 +33,7 @@ export default function Pricing() {
           </div>
           <p className="mt-2 text-sm text-dim">Prices are marked in USD</p>
 
-          <button className="mt-8 w-full bg-accent-secondary hover:bg-accent-secondary-hover text-shell font-semibold px-4 py-3 rounded-lg">
+          <button className="mt-8 w-full bg-accent hover:bg-accent-light text-shell font-semibold px-4 py-3 rounded-lg">
             Subscribe
           </button>
         </div>
@@ -59,7 +59,7 @@ export default function Pricing() {
             <span className="font-semibold text-shell">
               saves you over 62%
             </span>{" "}
-            in comparison to the monthly plan.
+            in comparison to the monthly plan. 
           </p>
 
           <div className="mt-auto pt-12 flex items-baseline gap-2">
