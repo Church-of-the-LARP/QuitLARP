@@ -24,6 +24,7 @@ import (
 	"backend/mailer"
 	"backend/middleware"
 	"backend/models"
+	"backend/sessions"
 )
 
 // pushSecretBytes is the length of the per-boot secret the git update hook
@@ -42,11 +43,14 @@ type Handlers struct {
 	// against; the git plumbing reads both fields.
 	generator  assessment.Generator
 	pushSecret string
+
+	// sessions runs the sandboxed environments candidates solve in.
+	sessions *sessions.Manager
 }
 
 // New builds the handler bundle.
 func New(db *sqlx.DB, cfg *config.Config, mail mailer.Mailer,
-	tokens *auth.Auth, google *auth.GoogleClient) *Handlers {
+	tokens *auth.Auth, google *auth.GoogleClient, solveSessions *sessions.Manager) *Handlers {
 	buf := make([]byte, pushSecretBytes)
 	if _, err := rand.Read(buf); err != nil {
 		log.Fatalf("push validation: generate callback secret: %v", err)
@@ -72,6 +76,7 @@ func New(db *sqlx.DB, cfg *config.Config, mail mailer.Mailer,
 		google:     google,
 		generator:  gen,
 		pushSecret: hex.EncodeToString(buf),
+		sessions:   solveSessions,
 	}
 }
 
@@ -85,6 +90,7 @@ func (h *Handlers) Register(api huma.API) {
 	h.registerAssessmentGit(api)
 	h.registerAssessmentChapters(api)
 	h.registerAssessmentTests(api)
+	h.registerAssessmentSessions(api)
 	h.registerTags(api)
 }
 

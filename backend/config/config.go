@@ -48,6 +48,7 @@ type Config struct {
 	Google         GoogleConfig
 	Superadmin     SuperadminConfig
 	Validation     ValidationConfig
+	AssessmentEnv  AssessmentEnvConfig
 }
 
 // ValidationConfig controls the push-time checks that need external tooling.
@@ -58,6 +59,44 @@ type ValidationConfig struct {
 	GenerateCommand string
 	// GenerateTimeout bounds one chapter's generation run.
 	GenerateTimeout time.Duration
+}
+
+// AssessmentEnvConfig holds the runtime defaults for the sandboxed assessment
+// runner: the resource limits and timeouts applied to every submission, and the
+// paths and image tags the supervisor uses. Everything is environment driven so
+// a deployment can tune the sandbox without a rebuild.
+type AssessmentEnvConfig struct {
+	// SessionTTL is the fallback lifetime of an assessment session whose own
+	// config sets no time limit (ASSESSMENT_SESSION_TTL, default 2h).
+	SessionTTL time.Duration
+	// MemoryBytes is the per-container memory limit in bytes
+	// (ASSESSMENT_MEMORY_MB, default 512, converted from MiB).
+	MemoryBytes int64
+	// NanoCPUs is the per-container CPU quota in units of 1e-9 CPU
+	// (ASSESSMENT_NANO_CPUS, default 1000000000, one core).
+	NanoCPUs int64
+	// PidsLimit caps the number of processes in a container
+	// (ASSESSMENT_PIDS_LIMIT, default 256).
+	PidsLimit int64
+	// BuildTimeout bounds one image build on the sandbox daemon
+	// (ASSESSMENT_BUILD_TIMEOUT, default 15m).
+	BuildTimeout time.Duration
+	// ExecTimeout bounds one command run inside a sandbox container
+	// (ASSESSMENT_EXEC_TIMEOUT, default 90s).
+	ExecTimeout time.Duration
+	// DataDir is the host directory the assessment runtime stores state under
+	// (ASSESSMENT_DATA_DIR, default "data").
+	DataDir string
+	// UTFSourceDir is where the shipped UFT sources live, used to build the
+	// harness image on the sandbox daemon (ASSESSMENT_UTF_SRC_DIR, default
+	// "/utf-src").
+	UTFSourceDir string
+	// HarnessImage is the tag of the platform harness builder image
+	// (ASSESSMENT_HARNESS_IMAGE, default "codingtest-harness:latest").
+	HarnessImage string
+	// ImagePrefix prefixes the tags of the per-assessment images
+	// (ASSESSMENT_IMAGE_PREFIX, default "codingtest-assessment").
+	ImagePrefix string
 }
 
 // GoogleConfig holds the OAuth2 client credentials for "Sign in with Google".
@@ -144,6 +183,19 @@ func Load() (*Config, error) {
 		GenerateTimeout: getDuration("VALIDATION_GENERATE_TIMEOUT", defaultGenerateTimeout),
 	}
 
+	cfg.AssessmentEnv = AssessmentEnvConfig{
+		SessionTTL:   getDuration("ASSESSMENT_SESSION_TTL", 2*time.Hour),
+		MemoryBytes:  getInt64("ASSESSMENT_MEMORY_MB", 512) << 20, // MiB to bytes
+		NanoCPUs:     getInt64("ASSESSMENT_NANO_CPUS", 1_000_000_000),
+		PidsLimit:    getInt64("ASSESSMENT_PIDS_LIMIT", 256),
+		BuildTimeout: getDuration("ASSESSMENT_BUILD_TIMEOUT", 15*time.Minute),
+		ExecTimeout:  getDuration("ASSESSMENT_EXEC_TIMEOUT", 90*time.Second),
+		DataDir:      get("ASSESSMENT_DATA_DIR", "data"),
+		UTFSourceDir: get("ASSESSMENT_UTF_SRC_DIR", "/utf-src"),
+		HarnessImage: get("ASSESSMENT_HARNESS_IMAGE", "codingtest-harness:latest"),
+		ImagePrefix:  get("ASSESSMENT_IMAGE_PREFIX", "codingtest-assessment"),
+	}
+
 	cfg.Email = EmailConfig{
 		Provider:        emailProvider(cfg.Env),
 		From:            get("EMAIL_FROM", "QuitLARP <no-reply@example.com>"),
@@ -228,6 +280,22 @@ func getDuration(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return d
+}
+
+// getInt64 parses a base-10 integer such as "512". Like getDuration, a value
+// that does not parse falls back to the default with a warning instead of
+// failing the boot.
+func getInt64(key string, fallback int64) int64 {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		log.Printf("WARNING: %s=%q is not a valid integer; using %d", key, raw, fallback)
+		return fallback
+	}
+	return v
 }
 
 func splitList(raw string) []string {

@@ -132,9 +132,12 @@ export default function AssessmentPreview() {
             <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
               leaderboard & solutions
             </button>
-            <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
+            <Link
+              to={`/assessments/${id}/solve`}
+              className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg"
+            >
               begin practice run
-            </button>
+            </Link>
           </div>
           {showRepositoryLink && (
             <Link

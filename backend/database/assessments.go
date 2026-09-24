@@ -27,6 +27,7 @@ type assessmentRow struct {
 	ID               int64             `db:"id"`
 	Title            string            `db:"title"`
 	Description      string            `db:"description"`
+	Kind             string            `db:"kind"`
 	Difficulty       models.Difficulty `db:"difficulty"`
 	TimeLimitMinutes int               `db:"time_limit_minutes"`
 	TemplateFileName string            `db:"template_file_name"`
@@ -39,7 +40,7 @@ type assessmentRow struct {
 
 // assessmentColumns is the SELECT list for the joined row shape above.
 const assessmentColumns = `
-	a.id, a.title, a.description, a.difficulty, a.time_limit_minutes,
+	a.id, a.title, a.description, a.kind, a.difficulty, a.time_limit_minutes,
 	a.template_file_name, a.template_file_content, a.author_id,
 	u.username AS author_username, a.created_at, a.updated_at`
 
@@ -55,6 +56,7 @@ func (r assessmentRow) summary() models.AssessmentSummary {
 		ID:               r.ID,
 		Title:            r.Title,
 		Description:      r.Description,
+		Kind:             r.Kind,
 		Difficulty:       r.Difficulty,
 		TimeLimitMinutes: r.TimeLimitMinutes,
 		TemplateFileName: r.TemplateFileName,
@@ -70,6 +72,7 @@ func (r assessmentRow) assessment() models.Assessment {
 		ID:               r.ID,
 		Title:            r.Title,
 		Description:      r.Description,
+		Kind:             r.Kind,
 		Difficulty:       r.Difficulty,
 		TimeLimitMinutes: r.TimeLimitMinutes,
 		Template: models.CodeFile{
@@ -215,7 +218,7 @@ func GetAssessmentDetail(ctx context.Context, db *sqlx.DB, id int64) (models.Ass
 
 	if err := db.SelectContext(ctx, &got.Chapters, `
 		SELECT id, assessment_id, position, title, description,
-		       time_limit_minutes, start_mode, created_at, updated_at
+		       time_limit_minutes, start_mode, task_file, created_at, updated_at
 		FROM chapters WHERE assessment_id = $1 ORDER BY position, id`, id); err != nil {
 		return models.Assessment{}, err
 	}
@@ -387,7 +390,7 @@ func GetAssessmentMainCommit(ctx context.Context, db *sqlx.DB, id int64) (string
 }
 
 // SyncAssessmentContent replaces the repository-derived content of an
-// assessment: description, chapters (matched by position) and the sync
+// assessment: kind, description, chapters (matched by position) and the sync
 // bookkeeping. Manually managed fields (title, difficulty, time limit, tags,
 // tests, template) are untouched. Runs in one transaction.
 func SyncAssessmentContent(ctx context.Context, db *sqlx.DB, id int64, content assessment.Content, mainCommit string) error {
@@ -399,8 +402,8 @@ func SyncAssessmentContent(ctx context.Context, db *sqlx.DB, id int64, content a
 
 	res, err := tx.ExecContext(ctx, `
 		UPDATE assessments
-		SET description = $2, main_commit = $3, synced_at = NOW()
-		WHERE id = $1`, id, content.Description, mainCommit)
+		SET description = $2, kind = $3, main_commit = $4, synced_at = NOW()
+		WHERE id = $1`, id, content.Description, content.Kind, mainCommit)
 	if err != nil {
 		return fmt.Errorf("sync assessment %d: %w", id, err)
 	}
@@ -423,18 +426,18 @@ func SyncAssessmentContent(ctx context.Context, db *sqlx.DB, id int64, content a
 		if _, ok := existing[ch.Index]; ok {
 			if _, err := tx.ExecContext(ctx, `
 				UPDATE chapters
-				SET title = $2, description = $3, start_mode = $4
-				WHERE assessment_id = $1 AND position = $5`,
-				id, ch.Name, ch.Readme, ch.Start, ch.Index); err != nil {
+				SET title = $2, description = $3, start_mode = $4, task_file = $5
+				WHERE assessment_id = $1 AND position = $6`,
+				id, ch.Name, ch.Readme, ch.Start, ch.Task, ch.Index); err != nil {
 				return fmt.Errorf("update chapter at position %d of assessment %d: %w", ch.Index, id, err)
 			}
 			continue
 		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO chapters (assessment_id, position, title, description,
-			                      start_mode, time_limit_minutes)
-			VALUES ($1, $2, $3, $4, $5, $6)`,
-			id, ch.Index, ch.Name, ch.Readme, ch.Start, defaultChapterTimeLimitMinutes); err != nil {
+			                      start_mode, task_file, time_limit_minutes)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			id, ch.Index, ch.Name, ch.Readme, ch.Start, ch.Task, defaultChapterTimeLimitMinutes); err != nil {
 			return fmt.Errorf("insert chapter at position %d of assessment %d: %w", ch.Index, id, err)
 		}
 	}
