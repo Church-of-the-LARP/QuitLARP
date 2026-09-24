@@ -15,14 +15,9 @@ import (
 	"backend/handlers"
 	"backend/mailer"
 	"backend/middleware"
+	"backend/sessions"
 	"backend/supervisor"
 )
-
-var containerSupervisor = &supervisor.Supervisor{}
-
-func init() {
-	containerSupervisor.Init()
-}
 
 func main() {
 	cfg, err := config.Load()
@@ -55,7 +50,25 @@ func main() {
 		log.Fatalf("mailer: %v", err)
 	}
 	log.Printf("email: provider=%s from=%s", cfg.Email.Provider, cfg.Email.From)
-	hs := handlers.New(db, cfg, mail, tokens, google)
+
+	// The sandboxed assessment environments run inside the dind daemon
+	// (gVisor runsc runtime). When it is unreachable the app still serves
+	// everything else; starting a solving session then fails with a clear
+	// error instead.
+	sandbox := &supervisor.Supervisor{}
+	if err := sandbox.Init(); err != nil {
+		log.Printf("WARNING: assessment sandboxes are unavailable: %v", err)
+	} else if err := sandbox.Health(context.Background()); err != nil {
+		log.Printf("WARNING: the assessment sandbox is not reachable yet: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	solveSessions := sessions.NewManager(cfg, sandbox, db)
+	solveSessions.CleanupOrphans(ctx)
+	go solveSessions.Janitor(ctx)
+
+	hs := handlers.New(db, cfg, mail, tokens, google, solveSessions)
 
 	// The typed, OpenAPI-documented API lives on its own mux...
 	apiMux := http.NewServeMux()

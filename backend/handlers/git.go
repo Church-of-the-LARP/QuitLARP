@@ -131,6 +131,12 @@ func (h *Handlers) gitInfoRefs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if assessmentID, solverID, ok := parseSolutionRepoID(repoID); ok {
+		if err := h.authorizeSolutionRepo(r.Context(), u, assessmentID, solverID, service); err != nil {
+			writeSolutionRepoFailure(w, err)
+			return
+		}
+	}
 
 	dir, err := h.gitRepoDir(repoID)
 	if err != nil {
@@ -179,6 +185,12 @@ func (h *Handlers) gitRPC(w http.ResponseWriter, r *http.Request) {
 	if id, ok := parseAssessmentRepoID(repoID); ok {
 		if err := h.authorizeAssessmentRepo(r.Context(), u, id); err != nil {
 			writeAssessmentRepoFailure(w, err)
+			return
+		}
+	}
+	if assessmentID, solverID, ok := parseSolutionRepoID(repoID); ok {
+		if err := h.authorizeSolutionRepo(r.Context(), u, assessmentID, solverID, service); err != nil {
+			writeSolutionRepoFailure(w, err)
 			return
 		}
 	}
@@ -283,15 +295,47 @@ func ensurePushHook(dir string) error {
 // and returns the assessment id it encodes.
 func parseAssessmentRepoID(repoID string) (int64, bool) {
 	rest, ok := strings.CutPrefix(strings.TrimSuffix(repoID, ".git"), "assessments/assessment-")
-	if !ok || rest == "" || (len(rest) > 1 && rest[0] == '0') {
+	if !ok {
 		return 0, false
 	}
-	for _, c := range rest {
+	return parsePositiveID(rest)
+}
+
+// parseSolutionRepoID recognises the repository name that holds one user's
+// solution for an assessment ("solutions/assessment-<id>/user-<uid>", with an
+// optional ".git" suffix) and returns the ids it encodes.
+func parseSolutionRepoID(repoID string) (int64, int64, bool) {
+	rest, ok := strings.CutPrefix(strings.TrimSuffix(repoID, ".git"), "solutions/assessment-")
+	if !ok {
+		return 0, 0, false
+	}
+	assessmentText, userText, ok := strings.Cut(rest, "/user-")
+	if !ok {
+		return 0, 0, false
+	}
+	assessmentID, ok := parsePositiveID(assessmentText)
+	if !ok {
+		return 0, 0, false
+	}
+	userID, ok := parsePositiveID(userText)
+	if !ok {
+		return 0, 0, false
+	}
+	return assessmentID, userID, true
+}
+
+// parsePositiveID parses a decimal repository id, rejecting empty values and
+// leading zeros so one repository cannot be addressed by several names.
+func parsePositiveID(text string) (int64, bool) {
+	if text == "" || (len(text) > 1 && text[0] == '0') {
+		return 0, false
+	}
+	for _, c := range text {
 		if c < '0' || c > '9' {
 			return 0, false
 		}
 	}
-	id, err := strconv.ParseInt(rest, 10, 64)
+	id, err := strconv.ParseInt(text, 10, 64)
 	if err != nil || id <= 0 {
 		return 0, false
 	}
@@ -334,6 +378,64 @@ func writeAssessmentRepoFailure(w http.ResponseWriter, err error) {
 		writeProblem(w, http.StatusForbidden, "you do not have permission to use this repository")
 	default:
 		log.Printf("assessment repository authorization: %v", err)
+		writeProblem(w, http.StatusInternalServerError, "git service unavailable")
+	}
+}
+
+// errSolutionReadOnly is the sentinel for a write to a solution repository.
+var errSolutionReadOnly = errors.New("solution repositories are read-only")
+
+// errNoSolutionRepo is the sentinel for a solution that has no row behind it.
+var errNoSolutionRepo = errors.New("no solution exists for this user and assessment")
+
+// authorizeSolutionRepo allows the solver, the assessment's author and
+// admins to read a solution; public solutions may be read by any signed-in
+// user. Writes are always refused: only the backend commits to solutions.
+func (h *Handlers) authorizeSolutionRepo(ctx context.Context, u models.User, assessmentID, solverID int64, service string) error {
+	if service == gitReceivePack {
+		return errSolutionReadOnly
+	}
+	if u.ID == solverID {
+		return nil
+	}
+	authorID, err := database.GetAssessmentAuthorID(ctx, h.db, assessmentID)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return errNoAssessmentRepo
+		}
+		return fmt.Errorf("solution assessment lookup: %w", err)
+	}
+	if (authorID != nil && *authorID == u.ID) ||
+		u.Role == models.RoleAdmin || u.Role == models.RoleSuperadmin {
+		return nil
+	}
+	solution, err := database.GetSolution(ctx, h.db, assessmentID, solverID)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return errNoSolutionRepo
+		}
+		return fmt.Errorf("solution lookup: %w", err)
+	}
+	if solution.Public {
+		return nil
+	}
+	return errAssessmentRepoForbidden
+}
+
+// writeSolutionRepoFailure turns a solution authorization failure into a
+// response.
+func writeSolutionRepoFailure(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, errSolutionReadOnly):
+		writeProblem(w, http.StatusForbidden, "solution repositories are read-only")
+	case errors.Is(err, errNoAssessmentRepo):
+		writeProblem(w, http.StatusNotFound, "no assessment backs this repository")
+	case errors.Is(err, errNoSolutionRepo):
+		writeProblem(w, http.StatusNotFound, "no solution exists for this user and assessment")
+	case errors.Is(err, errAssessmentRepoForbidden):
+		writeProblem(w, http.StatusForbidden, "you do not have permission to read this solution")
+	default:
+		log.Printf("solution repository authorization: %v", err)
 		writeProblem(w, http.StatusInternalServerError, "git service unavailable")
 	}
 }

@@ -35,14 +35,14 @@ func writeValidTree(t *testing.T, root string) {
 	mustWrite(t, filepath.Join(root, "dune-project"), "(lang dune 3.0)\n")
 	mustWrite(t, filepath.Join(root, "chapters", ".gitkeep"), "")
 	mustWrite(t, filepath.Join(root, "chapters", "1_a", "README.md"), "# Chapter a\n")
-	mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"), `{"start": "clean"}`)
+	mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"), `{"start": "clean", "task": "helper.ml"}`)
 	mustWrite(t, filepath.Join(root, "chapters", "1_a", "a.ml"), "let () = ()\n[@@utest]\n")
 	mustWrite(t, filepath.Join(root, "chapters", "1_a", "helper.ml"), "let x = 1\n")
 	mustWrite(t, filepath.Join(root, "chapters", "1_a", "sub", "b.ml"), "module B = struct end\n[@@ utest]\n")
 	mustWrite(t, filepath.Join(root, "chapters", "1_a", ".hidden.ml"), "let () = ()\n[@@utest]\n")
 	mustWrite(t, filepath.Join(root, "chapters", "1_a", "_build", "gen.ml"), "let () = ()\n[@@utest]\n")
 	mustWrite(t, filepath.Join(root, "chapters", "2_b", "README.md"), "# Chapter b\n")
-	mustWrite(t, filepath.Join(root, "chapters", "2_b", "chapter.json"), `{"start": "continue", "note": "extra field"}`)
+	mustWrite(t, filepath.Join(root, "chapters", "2_b", "chapter.json"), `{"start": "continue", "task": "spec.ml", "note": "extra field"}`)
 	mustWrite(t, filepath.Join(root, "chapters", "2_b", "dune-project"), "(lang dune 3.1)\n")
 	mustWrite(t, filepath.Join(root, "chapters", "2_b", "spec.ml"), "let () = ()\n[@@utest]\n")
 }
@@ -58,6 +58,9 @@ func TestLoadValid(t *testing.T) {
 	if content.Description != "# Assessment\n\nSolve the chapters.\n" {
 		t.Errorf("Description = %q", content.Description)
 	}
+	if content.Kind != "leetcode" {
+		t.Errorf("Kind = %q, want leetcode", content.Kind)
+	}
 	if len(content.Chapters) != 2 {
 		t.Fatalf("chapters = %d, want 2", len(content.Chapters))
 	}
@@ -72,6 +75,9 @@ func TestLoadValid(t *testing.T) {
 	if first.Start != "clean" {
 		t.Errorf("chapter 0 Start = %q, want clean", first.Start)
 	}
+	if first.Task != "helper.ml" {
+		t.Errorf("chapter 0 Task = %q, want helper.ml", first.Task)
+	}
 	if want := []string{"a.ml", "sub/b.ml"}; !reflect.DeepEqual(first.Specs, want) {
 		t.Errorf("chapter 0 Specs = %v, want %v", first.Specs, want)
 	}
@@ -83,8 +89,103 @@ func TestLoadValid(t *testing.T) {
 	if second.Start != "continue" {
 		t.Errorf("chapter 1 Start = %q, want continue", second.Start)
 	}
+	if second.Task != "spec.ml" {
+		t.Errorf("chapter 1 Task = %q, want spec.ml", second.Task)
+	}
 	if want := []string{"spec.ml"}; !reflect.DeepEqual(second.Specs, want) {
 		t.Errorf("chapter 1 Specs = %v, want %v", second.Specs, want)
+	}
+}
+
+func TestLoadKind(t *testing.T) {
+	cases := []struct {
+		name string
+		json string
+		file bool
+		kind string
+		want string
+	}{
+		{
+			name: "assessment.json absent defaults to leetcode",
+			kind: "leetcode",
+		},
+		{
+			name: "explicit leetcode",
+			file: true,
+			json: `{"kind": "leetcode"}`,
+			kind: "leetcode",
+		},
+		{
+			name: "object without kind defaults to leetcode",
+			file: true,
+			json: `{}`,
+			kind: "leetcode",
+		},
+		{
+			name: "unknown kind",
+			file: true,
+			json: `{"kind": "x"}`,
+			kind: "leetcode",
+			want: `assessment.json: unknown kind "x"`,
+		},
+		{
+			name: "kind is not a string",
+			file: true,
+			json: `{"kind": 7}`,
+			kind: "leetcode",
+			want: "assessment.json: unknown kind 7",
+		},
+		{
+			name: "malformed assessment.json",
+			file: true,
+			json: `{`,
+			kind: "leetcode",
+			want: "assessment.json: invalid JSON: unexpected end of JSON input",
+		},
+		{
+			name: "assessment.json is not an object",
+			file: true,
+			json: `[]`,
+			kind: "leetcode",
+			want: "assessment.json: not a JSON object",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeValidTree(t, root)
+			if tc.file {
+				mustWrite(t, filepath.Join(root, "assessment.json"), tc.json)
+			}
+
+			content, violations := Load(root)
+			if tc.want == "" {
+				if len(violations) != 0 {
+					t.Fatalf("violations = %v, want none", violations)
+				}
+			} else if want := []string{tc.want}; !reflect.DeepEqual(violations, want) {
+				t.Fatalf("violations = %v, want %v", violations, want)
+			}
+			if content.Kind != tc.kind {
+				t.Errorf("Kind = %q, want %q", content.Kind, tc.kind)
+			}
+		})
+	}
+}
+
+func TestLoadTaskPath(t *testing.T) {
+	root := t.TempDir()
+	writeValidTree(t, root)
+	mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"),
+		`{"start": "clean", "task": "./sub/b.ml"}`)
+
+	content, violations := Load(root)
+	if len(violations) != 0 {
+		t.Fatalf("violations = %v, want none", violations)
+	}
+	if got := content.Chapters[0].Task; got != "sub/b.ml" {
+		t.Errorf("chapter 0 Task = %q, want sub/b.ml", got)
 	}
 }
 
@@ -206,9 +307,63 @@ func TestLoadViolations(t *testing.T) {
 		{
 			name: "first chapter is continue",
 			mutate: func(t *testing.T, root string) {
-				mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"), `{"start": "continue"}`)
+				mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"),
+					`{"start": "continue", "task": "helper.ml"}`)
 			},
 			want: `chapters/1_a/chapter.json: the first chapter must use start "clean"`,
+		},
+		{
+			name: "task field missing",
+			mutate: func(t *testing.T, root string) {
+				mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"), `{"start": "clean"}`)
+			},
+			want: "chapters/1_a/chapter.json: task field is missing",
+		},
+		{
+			name: "task is not a string",
+			mutate: func(t *testing.T, root string) {
+				mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"), `{"start": "clean", "task": 5}`)
+			},
+			want: "chapters/1_a/chapter.json: task must be a string, got 5",
+		},
+		{
+			name: "task is empty",
+			mutate: func(t *testing.T, root string) {
+				mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"), `{"start": "clean", "task": ""}`)
+			},
+			want: "chapters/1_a/chapter.json: task must not be empty",
+		},
+		{
+			name: "task is absolute",
+			mutate: func(t *testing.T, root string) {
+				mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"),
+					`{"start": "clean", "task": "/etc/passwd"}`)
+			},
+			want: "chapters/1_a/chapter.json: task must be a relative path",
+		},
+		{
+			name: "task escapes the chapter",
+			mutate: func(t *testing.T, root string) {
+				mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"),
+					`{"start": "clean", "task": "../helper.ml"}`)
+			},
+			want: "chapters/1_a/chapter.json: task must stay inside the chapter directory",
+		},
+		{
+			name: "task names a directory",
+			mutate: func(t *testing.T, root string) {
+				mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"),
+					`{"start": "clean", "task": "sub"}`)
+			},
+			want: `chapters/1_a/chapter.json: task "sub": not a regular file`,
+		},
+		{
+			name: "task names a missing file",
+			mutate: func(t *testing.T, root string) {
+				mustWrite(t, filepath.Join(root, "chapters", "1_a", "chapter.json"),
+					`{"start": "clean", "task": "glue/two_sum_functions.py"}`)
+			},
+			want: `chapters/1_a/chapter.json: task "glue/two_sum_functions.py": missing`,
 		},
 		{
 			name: "chapter without a utest spec",

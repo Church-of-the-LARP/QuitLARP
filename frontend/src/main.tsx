@@ -47,7 +47,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/create" element={<Create />} />
               <Route path="/assessments/:id/git" element={<AssessmentGit />} />
               <Route path="/assessments/:id/preview" element={<AssessmentPreview />} />
-              <Route path="/assessments/solve/" element={<AssessmentSolveSingle />} />
+              <Route path="/assessments/:id/solve" element={<AssessmentSolveSingle />} />
               <Route element={<SecuredRoute roles={["admin", "superadmin"]} />}>
                 <Route path="/users" element={<Users />} />
               </Route>

@@ -64,6 +64,7 @@ type AssessmentSummary struct {
 	ID               int64      `json:"id" db:"id" doc:"Unique database identifier"`
 	Title            string     `json:"title" db:"title" doc:"Assessment title"`
 	Description      string     `json:"description" db:"description" doc:"What the candidate has to build"`
+	Kind             string     `json:"kind" db:"kind" doc:"Assessment kind, e.g. leetcode"`
 	Difficulty       Difficulty `json:"difficulty" db:"difficulty" enum:"easy,medium,hard" doc:"Difficulty rating"`
 	TimeLimitMinutes int        `json:"timeLimitMinutes" db:"time_limit_minutes" example:"120" doc:"Time limit for the whole assessment, in minutes"`
 	TemplateFileName string     `json:"templateFileName" db:"template_file_name" doc:"Name of the base template file the candidate starts from"`
@@ -83,6 +84,7 @@ type Chapter struct {
 	Description      string    `json:"description" db:"description" doc:"Chapter body text"`
 	TimeLimitMinutes int       `json:"timeLimitMinutes" db:"time_limit_minutes" example:"30" doc:"Time limit for this chapter, in minutes"`
 	StartMode        string    `json:"startMode" db:"start_mode" doc:"How the chapter starts: a clean file, or continued from the previous chapter"`
+	TaskFile         string    `json:"taskFile" db:"task_file" doc:"Chapter-relative slash path of the single candidate-edited file"`
 	CreatedAt        time.Time `json:"createdAt" db:"created_at" doc:"Creation time"`
 	UpdatedAt        time.Time `json:"updatedAt" db:"updated_at" doc:"Last modification time"`
 }
@@ -112,6 +114,7 @@ type Assessment struct {
 	ID               int64         `json:"id" db:"id" doc:"Unique database identifier"`
 	Title            string        `json:"title" db:"title" doc:"Assessment title"`
 	Description      string        `json:"description" db:"description" doc:"What the candidate has to build"`
+	Kind             string        `json:"kind" db:"kind" doc:"Assessment kind, e.g. leetcode"`
 	Difficulty       Difficulty    `json:"difficulty" db:"difficulty" enum:"easy,medium,hard" doc:"Difficulty rating"`
 	TimeLimitMinutes int           `json:"timeLimitMinutes" db:"time_limit_minutes" example:"120" doc:"Time limit for the whole assessment, in minutes"`
 	Template         CodeFile      `json:"template" doc:"Base template file the candidate starts from"`

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -19,13 +20,15 @@ import (
 // Content is an assessment tree. A non-empty violations slice from Load means
 // the content is incomplete and the push must be rejected.
 type Content struct {
+	Kind        string
 	Description string
 	Chapters    []Chapter
 }
 
 // Chapter is one chapter of the assessment. Dir is a slash path relative to the
 // tree root, Name is the directory name without the index prefix, Start is the
-// "start" value of chapter.json and Specs are chapter-relative slash paths of
+// "start" value of chapter.json, Task is the chapter-relative slash path of the
+// single candidate-edited file and Specs are chapter-relative slash paths of
 // the .ml files that declare a [@@utest] module.
 type Chapter struct {
 	Index  int
@@ -33,8 +36,12 @@ type Chapter struct {
 	Dir    string
 	Readme string
 	Start  string
+	Task   string
 	Specs  []string
 }
+
+// kindLeetcode is the only assessment kind the repository format defines.
+const kindLeetcode = "leetcode"
 
 var (
 	indexPattern = regexp.MustCompile(`^[1-9][0-9]*$`)
@@ -62,7 +69,18 @@ func Load(root string) (Content, []string) {
 		violations = append(violations, fmt.Sprintf(format, args...))
 	}
 
-	// Rules 1 and 2: the root Dockerfile and README.
+	// Rule 1: the optional root assessment.json.
+	content.Kind = kindLeetcode
+	if data, ok := readOptionalFileAt(filepath.Join(root, "assessment.json"), "assessment.json", add); ok {
+		kind, err := parseKind(data)
+		if err != nil {
+			add("assessment.json: %v", err)
+		} else {
+			content.Kind = kind
+		}
+	}
+
+	// Rules 2 and 3: the root Dockerfile and README.
 	readFileAt(filepath.Join(root, "Dockerfile"), "Dockerfile", add)
 	if data, ok := readFileAt(filepath.Join(root, "README.md"), "README.md", add); ok {
 		if strings.TrimSpace(data) == "" {
@@ -72,13 +90,13 @@ func Load(root string) (Content, []string) {
 		}
 	}
 
-	// Rule 3: the chapters directory and its direct visible entries.
+	// Rule 4: the chapters directory and its direct visible entries.
 	entries, ok := readChapterEntries(root, add)
 	if !ok {
 		return content, violations
 	}
 
-	// Rules 4 and 5: chapter directory names and the index sequence.
+	// Rules 5 and 6: chapter directory names and the index sequence.
 	var refs []chapterRef
 	seen := map[int]string{}
 	for _, name := range entries {
@@ -100,7 +118,7 @@ func Load(root string) (Content, []string) {
 		}
 	}
 
-	// Rules 6 to 10: the contents of every structurally valid chapter.
+	// Rules 7 to 12: the contents of every structurally valid chapter.
 	chapters := make([]Chapter, 0, len(refs))
 	for _, ref := range refs {
 		ch := Chapter{
@@ -160,12 +178,12 @@ func readChapterEntries(root string, add func(string, ...any)) ([]string, bool) 
 	return dirs, true
 }
 
-// loadChapter runs rules 6 to 10 for one chapter directory and fills in ch.
+// loadChapter runs rules 7 to 12 for one chapter directory and fills in ch.
 func loadChapter(root, entry string, ch *Chapter, add func(string, ...any)) {
 	dir := filepath.Join(root, "chapters", entry)
 	base := "chapters/" + entry
 
-	// Rule 6: the chapter README.
+	// Rule 7: the chapter README.
 	if data, ok := readFileAt(filepath.Join(dir, "README.md"), base+"/README.md", add); ok {
 		if strings.TrimSpace(data) == "" {
 			add("%s/README.md: empty", base)
@@ -174,22 +192,37 @@ func loadChapter(root, entry string, ch *Chapter, add func(string, ...any)) {
 		}
 	}
 
-	// Rule 7: the chapter manifest.
+	// Rule 8: the chapter manifest.
 	if data, ok := readFileAt(filepath.Join(dir, "chapter.json"), base+"/chapter.json", add); ok {
-		start, err := parseStart(data)
+		start, task, err := parseChapterManifest(data)
 		if err != nil {
 			add("%s/chapter.json: %v", base, err)
 		} else {
 			ch.Start = start
+			ch.Task = task
 		}
 	}
 
-	// Rule 8: the first chapter always assigns a clean file.
+	// Rule 9: the first chapter always assigns a clean file.
 	if ch.Index == 1 && ch.Start == "continue" {
 		add("%s/chapter.json: the first chapter must use start \"clean\"", base)
 	}
 
-	// Rule 9: at least one .ml file declaring a [@@utest] module.
+	// Rule 10: the candidate file the manifest declares. An empty Task means the
+	// manifest itself was already rejected above.
+	if ch.Task != "" {
+		info, err := os.Lstat(filepath.Join(dir, filepath.FromSlash(ch.Task)))
+		switch {
+		case os.IsNotExist(err):
+			add("%s/chapter.json: task %q: missing", base, ch.Task)
+		case err != nil:
+			add("%s/chapter.json: task %q: %v", base, ch.Task, err)
+		case !info.Mode().IsRegular():
+			add("%s/chapter.json: task %q: not a regular file", base, ch.Task)
+		}
+	}
+
+	// Rule 11: at least one .ml file declaring a [@@utest] module.
 	specs, err := findSpecs(dir)
 	if err != nil {
 		add("%s: %v", base, err)
@@ -199,7 +232,7 @@ func loadChapter(root, entry string, ch *Chapter, add func(string, ...any)) {
 		ch.Specs = specs
 	}
 
-	// Rule 10: a dune-project at the chapter or any ancestor up to the root.
+	// Rule 12: a dune-project at the chapter or any ancestor up to the root.
 	if !hasDuneProject(root, dir) {
 		add("%s: no dune-project at the chapter or an ancestor", base)
 	}
@@ -222,9 +255,10 @@ func parseChapterDir(dir string) (int, string, bool) {
 	return index, name, true
 }
 
-// parseStart extracts the "start" field of a chapter.json manifest, which must
-// be a JSON object whose start is exactly "clean" or "continue".
-func parseStart(data string) (string, error) {
+// parseKind extracts the "kind" field of an assessment.json manifest. The
+// manifest is optional; when present it must be a JSON object whose kind, if
+// given, is a known assessment kind.
+func parseKind(data string) (string, error) {
 	var value any
 	if err := json.Unmarshal([]byte(data), &value); err != nil {
 		return "", fmt.Errorf("invalid JSON: %v", err)
@@ -233,15 +267,75 @@ func parseStart(data string) (string, error) {
 	if !ok {
 		return "", errors.New("not a JSON object")
 	}
-	raw, ok := object["start"]
+	raw, ok := object["kind"]
 	if !ok {
-		return "", errors.New("start field is missing")
+		return kindLeetcode, nil
 	}
-	start, ok := raw.(string)
+	kind, ok := raw.(string)
+	if !ok {
+		return "", fmt.Errorf("unknown kind %v", raw)
+	}
+	if kind != kindLeetcode {
+		return "", fmt.Errorf("unknown kind %q", kind)
+	}
+	return kind, nil
+}
+
+// parseChapterManifest extracts the "start" and "task" fields of a chapter.json
+// manifest, which must be a JSON object whose start is exactly "clean" or
+// "continue" and whose task is a chapter-relative path.
+func parseChapterManifest(data string) (string, string, error) {
+	var value any
+	if err := json.Unmarshal([]byte(data), &value); err != nil {
+		return "", "", fmt.Errorf("invalid JSON: %v", err)
+	}
+	object, ok := value.(map[string]any)
+	if !ok {
+		return "", "", errors.New("not a JSON object")
+	}
+	rawStart, ok := object["start"]
+	if !ok {
+		return "", "", errors.New("start field is missing")
+	}
+	start, ok := rawStart.(string)
 	if !ok || (start != "clean" && start != "continue") {
-		return "", fmt.Errorf("start must be \"clean\" or \"continue\", got %v", raw)
+		return "", "", fmt.Errorf("start must be \"clean\" or \"continue\", got %v", rawStart)
 	}
-	return start, nil
+	rawTask, ok := object["task"]
+	if !ok {
+		return "", "", errors.New("task field is missing")
+	}
+	task, ok := rawTask.(string)
+	if !ok {
+		return "", "", fmt.Errorf("task must be a string, got %v", rawTask)
+	}
+	cleaned, err := cleanTask(task)
+	if err != nil {
+		return "", "", err
+	}
+	return start, cleaned, nil
+}
+
+// cleanTask validates a chapter.json "task" path and returns it as a cleaned
+// slash path relative to the chapter directory. Absolute paths and paths that
+// escape the directory are rejected.
+func cleanTask(task string) (string, error) {
+	if task == "" {
+		return "", errors.New("task must not be empty")
+	}
+	if path.IsAbs(task) {
+		return "", errors.New("task must be a relative path")
+	}
+	for _, part := range strings.Split(task, "/") {
+		if part == ".." {
+			return "", errors.New("task must stay inside the chapter directory")
+		}
+	}
+	cleaned := path.Clean(task)
+	if cleaned == "." {
+		return "", errors.New("task must not be empty")
+	}
+	return cleaned, nil
 }
 
 // findSpecs walks a chapter directory and returns the chapter-relative slash
@@ -304,6 +398,30 @@ func hasDuneProject(root, dir string) bool {
 		}
 		dir = parent
 	}
+}
+
+// readOptionalFileAt is readFileAt for a file that may legitimately be absent:
+// a missing file returns ok false without a violation, any other problem is
+// reported like readFileAt.
+func readOptionalFileAt(path, loc string, add func(string, ...any)) (string, bool) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false
+		}
+		add("%s: %v", loc, err)
+		return "", false
+	}
+	if !info.Mode().IsRegular() {
+		add("%s: not a regular file", loc)
+		return "", false
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		add("%s: %v", loc, err)
+		return "", false
+	}
+	return string(data), true
 }
 
 // readFileAt reads a regular file and reports a violation when it is missing,
