@@ -81,6 +81,14 @@ func SetSolutionPublic(ctx context.Context, db *sqlx.DB, id int64, public bool) 
 	return GetSolutionByID(ctx, db, id)
 }
 
+// CountSolutionsByUser returns how many assessments a user has submitted a
+// solution for.
+func CountSolutionsByUser(ctx context.Context, db *sqlx.DB, userID int64) (int64, error) {
+	var count int64
+	err := db.GetContext(ctx, &count, "SELECT COUNT(*) FROM solutions WHERE user_id = $1", userID)
+	return count, err
+}
+
 // ListSolutions returns every solution of an assessment, newest first.
 func ListSolutions(ctx context.Context, db *sqlx.DB, assessmentID int64) ([]models.Solution, error) {
 	rows := []solutionRow{}

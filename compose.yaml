@@ -27,6 +27,27 @@ services:
       timeout: 3s
       retries: 12
 
+  # Sandbox daemon for the assessment supervisor: a nested dockerd with the
+  # runsc (gVisor) runtime registered (see backend/supervisor/dind.Dockerfile).
+  # Needs --privileged to run its own dockerd; DOCKER_TLS_CERTDIR="" disables
+  # the dind entrypoint's TLS setup so it listens on plain 2375, fine since
+  # it's only reachable from other containers on this compose network.
+  dind:
+    build:
+      context: ./backend/supervisor
+      dockerfile: dind.Dockerfile
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - dind-storage:/var/lib/docker
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+
   backend:
     build:
       context: ./backend
@@ -43,12 +64,17 @@ services:
       # The backend image ships the utf CLI, so the gate invokes it directly
       # instead of going through dune the way the .env.example default does.
       VALIDATION_GENERATE_COMMAND: utf gen python
+      # The assessment supervisor's docker client (client.FromEnv) talks to
+      # the dind service over plain TCP on the compose network.
+      DOCKER_HOST: tcp://dind:2375
     ports:
       - "8888:8888"
     depends_on:
       db:
         condition: service_healthy
       mailpit:
+        condition: service_healthy
+      dind:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8888/openapi.json"]
@@ -75,3 +101,4 @@ volumes:
   pgdata:
   gomod:
   node_modules:
+  dind-storage:

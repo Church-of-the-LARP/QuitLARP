@@ -161,6 +161,22 @@ func (m *Manager) Start(ctx context.Context, user models.User, assessmentID int6
 	return session, nil
 }
 
+// ListByUser returns the user's live sessions across every assessment,
+// skipping any that just passed their deadline.
+func (m *Manager) ListByUser(userID int64) []*Session {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := time.Now()
+	out := []*Session{}
+	for key, session := range m.live {
+		if key.userID != userID || now.After(session.Deadline) {
+			continue
+		}
+		out = append(out, session)
+	}
+	return out
+}
+
 // Current returns the user's live session for an assessment. Expired
 // sessions are ended here so callers never see a dead one.
 func (m *Manager) Current(userID, assessmentID int64) (*Session, bool) {
@@ -260,6 +276,10 @@ func (m *Manager) Submit(ctx context.Context, user models.User, session *Session
 	solution, err := database.SaveSolution(ctx, m.db, session.AssessmentID, user.ID, sha, public)
 	if err != nil {
 		return models.Solution{}, err
+	}
+	if err := database.CreateNotification(ctx, m.db, user.ID, "Solution submitted",
+		fmt.Sprintf("You submitted your solution to %s", session.AssessmentTitle)); err != nil {
+		log.Printf("sessions: create submit notification for user %d: %v", user.ID, err)
 	}
 
 	m.mu.Lock()

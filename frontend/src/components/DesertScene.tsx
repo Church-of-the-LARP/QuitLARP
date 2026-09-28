@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 
 const DUNE_COLORS = {
-  back: "oklch(86.5% 0.012 325.68)", // mauve-300
-  mid1: "oklch(71.1% 0.019 323.02)", // mauve-400
-  mid2: "oklch(54.2% 0.034 322.5)", // mauve-500
-  front: "oklch(36.4% 0.029 323.89)", // mauve-700
+  back: "oklch(86.5% 0.025 110)", // olive-300
+  mid1: "oklch(71.1% 0.045 108)", // olive-400
+  mid2: "oklch(54.2% 0.07 106)", // olive-500
+  front: "oklch(36.4% 0.06 105)", // olive-700
 };
 
 const SUN_CORE = "oklch(96% 0.025 100)";
