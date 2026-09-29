@@ -141,9 +141,9 @@ function App() {
       .includes(normalizedFilter),
   );
   const visibleAssessments = assessments.filter((item) =>
-    `${item.title} ${item.author?.username ?? ''} ${item.kind} ${item.tags
-      .map((tag) => tag.name)
-      .join(' ')}`
+    `${item.title} ${item.author?.username ?? ''} ${item.kind} ${item.tags ? item.tags
+      .map((tag: { name: any; }) => tag.name)
+      .join(' ') : null}`
       .toLowerCase()
       .includes(normalizedFilter),
   );
@@ -386,7 +386,7 @@ function App() {
                     {item.author?.username ?? 'Unknown author'} · {item.kind} · {item.difficulty}
                   </p>
                   <p className="mt-1 text-xs text-dim">
-                    {item.tags.map((tag) => tag.name).join(' · ') || 'No tags'}
+                    {item.tags?.map((tag) => tag.name).join(' · ') || 'No tags'}
                     {' · '}Updated {new Date(item.updatedAt).toLocaleDateString()}
                   </p>
                 </div>
