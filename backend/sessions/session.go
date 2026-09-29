@@ -20,13 +20,14 @@ const maxFileBytes = 512 << 10
 
 // Errors the handlers map to HTTP statuses.
 var (
-	ErrUnsupported    = errors.New("this assessment kind is not supported yet")
-	ErrNotRunnable    = errors.New("this assessment has no solvable chapter")
-	ErrNotSynced      = errors.New("the assessment repository has not been pushed to yet")
-	ErrSessionGone    = errors.New("the solving session is no longer running")
-	ErrTaskFileOnly   = errors.New("only the declared task file can be written")
-	ErrFileTooLarge   = errors.New("the file is larger than the editor allows")
-	ErrAssessmentGone = errors.New("the assessment no longer exists")
+	ErrUnsupported     = errors.New("this assessment kind is not supported yet")
+	ErrNotRunnable     = errors.New("this assessment has no solvable chapter")
+	ErrNotSynced       = errors.New("the assessment repository has not been pushed to yet")
+	ErrSessionGone     = errors.New("the solving session is no longer running")
+	ErrSessionNotFound = errors.New("the solving session was not found")
+	ErrTaskFileOnly    = errors.New("only the declared task file can be written")
+	ErrFileTooLarge    = errors.New("the file is larger than the editor allows")
+	ErrAssessmentGone  = errors.New("the assessment no longer exists")
 )
 
 // SpecRun is one check bundle of a chapter: the compiled harness executable
@@ -56,6 +57,22 @@ type Session struct {
 
 	specs []SpecRun
 	mu    sync.Mutex
+}
+
+// AdminSession is the operational view of one gVisor container used by an
+// assessment session. Candidate file contents and harness details are omitted.
+type AdminSession struct {
+	ID              string     `json:"id"`
+	ContainerID     string     `json:"containerId"`
+	UserID          int64      `json:"userId"`
+	AssessmentID    int64      `json:"assessmentId"`
+	AssessmentTitle string     `json:"assessmentTitle"`
+	ChapterTitle    string     `json:"chapterTitle"`
+	Runtime         string     `json:"runtime"`
+	State           string     `json:"state"`
+	Image           string     `json:"image"`
+	CreatedAt       *time.Time `json:"createdAt,omitempty"`
+	Deadline        *time.Time `json:"deadline,omitempty"`
 }
 
 // TestResult is one check reported by the chapter harness.

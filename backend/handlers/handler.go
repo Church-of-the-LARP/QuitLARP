@@ -86,6 +86,7 @@ func (h *Handlers) Register(api huma.API) {
 	h.registerAuth(api)
 	h.registerEmailFlows(api)
 	h.registerUsers(api)
+	h.registerAdminSessions(api)
 	h.registerAssessments(api)
 	h.registerAssessmentGit(api)
 	h.registerAssessmentChapters(api)

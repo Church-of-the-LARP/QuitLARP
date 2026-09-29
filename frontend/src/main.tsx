@@ -13,7 +13,7 @@ import Register from "./pages/Register.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
-import Users from "./pages/Users.tsx";
+import Admin from "./pages/Admin.tsx";
 import Create from "./pages/Create.tsx";
 import AssessmentGit from "./pages/AssessmentGit.tsx";
 import Layout from "./components/Layout.tsx";
@@ -49,7 +49,8 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/assessments/:id/preview" element={<AssessmentPreview />} />
               <Route path="/assessments/:id/solve" element={<AssessmentSolveSingle />} />
               <Route element={<SecuredRoute roles={["admin", "superadmin"]} />}>
-                <Route path="/users" element={<Users />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/users" element={<Navigate to="/admin" replace />} />
               </Route>
             </Route>
           </Route>

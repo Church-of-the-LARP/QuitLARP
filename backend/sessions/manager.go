@@ -318,6 +318,67 @@ func (m *Manager) CleanupOrphans(ctx context.Context) {
 	}
 }
 
+// AdminSessions lists the gVisor containers used by assessment sessions,
+// including their session metadata when they belong to this process.
+func (m *Manager) AdminSessions(ctx context.Context) ([]AdminSession, error) {
+	containers, err := m.sup.ListContainers(ctx, map[string]string{sessionLabelRole: sessionRole})
+	if err != nil {
+		return nil, err
+	}
+
+	liveByID := make(map[string]*Session)
+	for _, session := range m.snapshot() {
+		liveByID[session.ID] = session
+	}
+
+	result := make([]AdminSession, 0, len(containers))
+	for _, container := range containers {
+		sessionID := container.Labels["codingtest.session"]
+		if sessionID == "" {
+			continue
+		}
+		item := AdminSession{
+			ID:          sessionID,
+			ContainerID: container.ID,
+			Runtime:     "runsc",
+			State:       container.State,
+			Image:       container.Image,
+		}
+		if session := liveByID[sessionID]; session != nil {
+			item.UserID = session.UserID
+			item.AssessmentID = session.AssessmentID
+			item.AssessmentTitle = session.AssessmentTitle
+			item.ChapterTitle = session.ChapterTitle
+			item.CreatedAt = &session.CreatedAt
+			item.Deadline = &session.Deadline
+		}
+		result = append(result, item)
+	}
+	return result, nil
+}
+
+// AdminStop ends a live session, or removes its labeled container if the
+// in-memory session was lost while the container remained in Docker.
+func (m *Manager) AdminStop(ctx context.Context, sessionID string) error {
+	for _, session := range m.snapshot() {
+		if session.ID == sessionID {
+			return m.Abandon(session)
+		}
+	}
+
+	containers, err := m.sup.ListContainers(ctx, map[string]string{
+		sessionLabelRole:     sessionRole,
+		"codingtest.session": sessionID,
+	})
+	if err != nil {
+		return err
+	}
+	if len(containers) == 0 {
+		return ErrSessionNotFound
+	}
+	return m.sup.RemoveDockerContainer(ctx, containers[0].ID)
+}
+
 // checkAlive rejects work on a session that passed its deadline.
 func (m *Manager) checkAlive(session *Session) error {
 	if time.Now().After(session.Deadline) {

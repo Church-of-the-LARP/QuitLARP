@@ -22,10 +22,10 @@ export default function Navbar({ user, isAdmin, roleStyles, handleLogout }: Navb
           </Link>
           {isAdmin && (
             <Link
-              to="/users"
+              to="/admin"
               className="text-sm text-muted hover:text-ink"
             >
-              Users
+              Admin
             </Link>
           )}
         </div>
