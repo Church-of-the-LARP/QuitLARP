@@ -89,11 +89,12 @@ func (r assessmentRow) assessment() models.Assessment {
 }
 
 // AssessmentFilter narrows GET /assessments. Nil Difficulty and empty
-// Tag/Q mean "no filter on that axis".
+// Tag/Q/Author mean "no filter on that axis".
 type AssessmentFilter struct {
 	Difficulty *models.Difficulty
 	Tag        string
 	Q          string
+	Author     string
 	Offset     int
 	Limit      int
 }
@@ -117,6 +118,10 @@ func assessmentWhere(f AssessmentFilter) (string, []any) {
 		args = append(args, "%"+f.Q+"%")
 		conds = append(conds, fmt.Sprintf(
 			"(a.title ILIKE $%d OR a.description ILIKE $%d)", len(args), len(args)))
+	}
+	if f.Author != "" {
+		args = append(args, "%"+f.Author+"%")
+		conds = append(conds, fmt.Sprintf("u.username ILIKE $%d", len(args)))
 	}
 	if len(conds) == 0 {
 		return "", nil
@@ -162,7 +167,7 @@ func ListAssessments(ctx context.Context, db *sqlx.DB, f AssessmentFilter) ([]mo
 // (used for pagination metadata alongside ListAssessments).
 func CountAssessments(ctx context.Context, db *sqlx.DB, f AssessmentFilter) (int64, error) {
 	where, args := assessmentWhere(f)
-	query := "SELECT COUNT(*) FROM assessments a" + where
+	query := "SELECT COUNT(*) FROM assessments a LEFT JOIN users u ON u.id = a.author_id" + where
 	var total int64
 	if err := db.GetContext(ctx, &total, query, args...); err != nil {
 		return 0, err

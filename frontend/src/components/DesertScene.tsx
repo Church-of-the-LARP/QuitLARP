@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 
 const DUNE_COLORS = {
-  back: "oklch(86.5% 0.012 325.68)", // mauve-300
-  mid1: "oklch(71.1% 0.019 323.02)", // mauve-400
-  mid2: "oklch(54.2% 0.034 322.5)", // mauve-500
-  front: "oklch(36.4% 0.029 323.89)", // mauve-700
+  back: "oklch(86.5% 0.025 110)", // olive-300
+  mid1: "oklch(71.1% 0.045 108)", // olive-400
+  mid2: "oklch(54.2% 0.07 106)", // olive-500
+  front: "oklch(36.4% 0.06 105)", // olive-700
 };
 
 const SUN_CORE = "oklch(96% 0.025 100)";
@@ -24,7 +24,7 @@ export default function DesertScene() {
     if (!container || !sunWrap) return;
 
     const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
+      "(prefers-reduced-motion: reduce)",
     ).matches;
     const canHover = window.matchMedia("(hover: hover)").matches;
 
@@ -86,11 +86,12 @@ export default function DesertScene() {
     const idle = (t: number) => {
       const dt = (t - t0) / 1000;
       const rect = container.getBoundingClientRect();
-      targetX = rect.left + rect.width * 0.5 + Math.sin(dt * 0.15) * rect.width * 0.28;
+      targetX =
+        rect.left + rect.width * 0.5 + Math.sin(dt * 0.15) * rect.width * 0.28;
       targetY = clampY(
         rect.top + rect.height * 0.3 + Math.sin(dt * 0.1) * rect.height * 0.08,
         rect.top,
-        rect.height
+        rect.height,
       );
       sunX += (targetX - sunX) * IDLE_EASE;
       sunY += (targetY - sunY) * IDLE_EASE;
