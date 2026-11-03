@@ -187,7 +187,7 @@ export default function Landing() {
   usePageTitle();
 
   return (
-    <div className="mx-auto w-[75vw] py-20">
+    <div className="mx-auto w-[calc(100%-2rem)] sm:w-[75vw] py-20">
       <section className="flex flex-col items-center text-center">
         <p className="mb-4 text-xs font-semibold uppercase text-accent-light">
           Practice technical interviews with real code
