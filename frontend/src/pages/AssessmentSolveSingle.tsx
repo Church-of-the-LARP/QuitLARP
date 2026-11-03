@@ -3,6 +3,7 @@ import Editor from "@monaco-editor/react";
 import Markdown from "react-markdown";
 import { Link, useParams } from "react-router-dom";
 import usePageTitle from "../scripts/usePageTitle.ts";
+import { APP_THEME, defineAppTheme } from "../scripts/monacoTheme.ts";
 import {
   SolveApiError,
   abandonSession,
@@ -452,24 +453,24 @@ export default function AssessmentSolveSingle() {
   }
 
   return (
-    <div className="mx-auto w-[95vw] py-10 overflow-hidden">
+    <div className="mx-auto w-[calc(100%-1rem)] md:w-[95vw] py-10 overflow-hidden">
       <div
         ref={containerRef}
-        className="flex flex-col w-full bg-panel rounded-xl p-6"
+        className="flex flex-col w-full bg-panel rounded-xl p-4 md:p-6"
       >
-        <div className="flex flex-row items-center justify-between gap-4 mb-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <h1 className="flex items-center gap-3 text-2xl font-bold text-ink">
             <span className="h-6 w-1.5 rounded-full bg-accent" />
             {assessment.title}
           </h1>
-          <div className="flex flex-row items-center gap-3">
-            <label className="flex items-center gap-2 text-xs text-muted">
+          <div className="flex flex-row flex-wrap items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted transition hover:text-accent-lighter has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
               <input
                 type="checkbox"
                 checked={isPublic}
                 onChange={(event) => setIsPublic(event.target.checked)}
                 disabled={controlsDisabled}
-                className="h-3.5 w-3.5 accent-accent"
+                className="h-4 w-4 shrink-0 cursor-[inherit] appearance-none rounded border border-line-hover bg-surface bg-center bg-no-repeat outline-none transition checked:border-accent checked:bg-accent checked:bg-[url('data:image/svg+xml;utf8,<svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2016%2016%22%20fill=%22none%22%20stroke=%22%2309090b%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22><path%20d=%22M3.5%208.5l3%203%206-6.5%22/></svg>')] focus-visible:ring-2 focus-visible:ring-accent/30"
               />
               make my solution public
             </label>
@@ -485,14 +486,14 @@ export default function AssessmentSolveSingle() {
               type="button"
               onClick={handleSubmit}
               disabled={controlsDisabled}
-              className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg transition disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell font-semibold px-4 py-2 rounded-lg transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? "Submitting..." : "Submit"}
             </button>
             <button
               type="button"
               onClick={handleLeave}
-              className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-muted transition hover:text-accent-lighter"
+              className="rounded-lg border border-line px-4 py-2 font-semibold text-muted transition hover:text-accent-lighter"
             >
               Leave session
             </button>
@@ -526,10 +527,10 @@ export default function AssessmentSolveSingle() {
           </div>
         )}
 
-        <div className="mt-4 flex flex-row gap-2 w-full min-h-[60vh]">
+        <div className="mt-4 flex flex-col md:flex-row gap-4 md:gap-2 w-full md:min-h-[60vh]">
           <aside
-            style={{ width: asideWidth }}
-            className="flex flex-col gap-3 shrink-0 overflow-auto pr-4"
+            style={{ "--aside-w": `${asideWidth}px` } as React.CSSProperties}
+            className="flex flex-col gap-3 md:shrink-0 overflow-auto max-h-[50vh] md:max-h-none md:w-(--aside-w) md:pr-4"
           >
             <p className="text-xs font-semibold uppercase text-accent-light">
               {session.chapterTitle || `chapter ${session.chapterId}`}
@@ -614,11 +615,11 @@ export default function AssessmentSolveSingle() {
 
           <div
             onMouseDown={handleDragStart}
-            className="w-1.5 shrink-0 cursor-col-resize hover:bg-accent-lighter/50 transition mr-3 rounded border-r border-line"
+            className="hidden md:block w-1.5 shrink-0 cursor-col-resize hover:bg-accent-lighter/50 transition mr-3 rounded border-r border-line"
           />
 
           <main className="flex min-w-0 flex-1 flex-col gap-3">
-            <div className="flex flex-row items-center justify-between w-full gap-4 text-sm text-muted">
+            <div className="flex flex-row flex-wrap items-center justify-between w-full gap-2 md:gap-4 text-sm text-muted">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-secondary/40 bg-accent-secondary/15 px-3 py-1 font-mono text-xs text-accent-secondary-hover w-fit">
                 <span className="h-1.5 w-1.5 rounded-full bg-accent-secondary" />
                 {language}
@@ -661,12 +662,17 @@ export default function AssessmentSolveSingle() {
               </div>
             ) : (
               <Editor
-                height="70vh"
+                height="60vh"
                 language={language}
                 value={content}
                 onChange={(value) => setContent(value ?? "")}
-                theme="vs-dark"
-                options={{ automaticLayout: true, readOnly: expired }}
+                theme={APP_THEME}
+                beforeMount={defineAppTheme}
+                options={{
+                  automaticLayout: true,
+                  readOnly: expired,
+                  padding: { top: 8, bottom: 8 },
+                }}
                 className="rounded-lg overflow-hidden"
               />
             )}
