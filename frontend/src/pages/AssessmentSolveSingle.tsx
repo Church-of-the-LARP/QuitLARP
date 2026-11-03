@@ -605,7 +605,7 @@ export default function AssessmentSolveSingle() {
                 )}
 
                 {raw && (
-                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-surface p-3 font-mono text-xs text-muted">
+                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border border-line-hover bg-surface p-3 font-mono text-xs text-muted">
                     {raw}
                   </pre>
                 )}
@@ -635,7 +635,7 @@ export default function AssessmentSolveSingle() {
             </div>
 
             {solution ? (
-              <div className="flex flex-col gap-3 rounded-lg bg-success/10 p-6">
+              <div className="flex flex-col gap-3 rounded-lg border border-success/40 bg-success/10 p-6">
                 <p className="text-sm font-semibold text-success">
                   Solution submitted
                 </p>
