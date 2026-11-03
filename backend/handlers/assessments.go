@@ -135,6 +135,7 @@ type ListAssessmentsInput struct {
 	Difficulty string `query:"difficulty" doc:"Filter by difficulty rating"`
 	Tag        string `query:"tag" doc:"Filter by tag name (case-insensitive)"`
 	Q          string `query:"q" doc:"Search term matched against title and description"`
+	Author     string `query:"author" doc:"Search term matched against the author's username (case-insensitive)"`
 	Offset     int    `query:"offset" example:"0" doc:"Number of results to skip"`
 	Limit      int    `query:"limit" example:"50" doc:"Maximum number of results (1-100, default 50)"`
 }
@@ -197,6 +198,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		filter := database.AssessmentFilter{
 			Tag:    strings.TrimSpace(input.Tag),
 			Q:      strings.TrimSpace(input.Q),
+			Author: strings.TrimSpace(input.Author),
 			Offset: input.Offset,
 			Limit:  limit,
 		}
