@@ -3,9 +3,12 @@ import Alert from "../components/Alert.tsx";
 import useAuth from "../scripts/useAuth.tsx";
 import type { ActionResult } from "../types/types.ts";
 import usePageTitle from "../scripts/usePageTitle.ts";
+import { useNotifications } from "../scripts/useNotifications.ts";
 import {
   getAssessments,
   getScheduled,
+  getNotifications,
+  type Notification,
   type ScheduledAssessment,
   getTags,
   type AssessmentSummary,
@@ -13,23 +16,14 @@ import {
   type TagCount,
 } from "../scripts/dashApi.ts";
 
-const notifications = [
-  {
-    title: "Your test was published",
-    detail: "Improvisation Essentials is now public",
-    time: "2h ago",
-  },
-  {
-    title: "New comment on your answer",
-    detail: "Mara Chen replied to your discussion",
-    time: "Yesterday",
-  },
-  {
-    title: "You earned a new badge",
-    detail: "Completed 5 tests",
-    time: "3d ago",
-  },
-];
+function timeAgo(iso: string) {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 function VerifyEmailBanner({
   setCloseEmail,
@@ -74,6 +68,19 @@ function App() {
   const emptyFilters: Filters = { q: "", author: "", difficulty: "", tag: "" };
   const { user } = useAuth();
   const [closeEmail, setCloseEmail] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    getNotifications()
+      .then(setNotifications)
+      .catch(() => setNotifications([]));
+  }, []);
+
+  // the backend pushes {type: "notification", data: <Notification>}
+  useNotifications((n) => {
+    if (n.type !== "notification") return;
+    setNotifications((prev) => [n.data as Notification, ...prev]);
+  }, !!user);
   const [draft, setDraft] = useState<Filters>(emptyFilters);
   const firstLoad = useRef(true);
   const [publicTests, setPublicTests] = useState<AssessmentSummary[]>([]);
@@ -357,10 +364,15 @@ function App() {
             </p>
             <h1 className="mb-6 text-3xl font-bold text-ink">Notifications</h1>
             <div className="flex flex-col gap-5">
-              {notifications.map((notification, idx) => (
+              {notifications.length === 0 && (
+                <div className="w-full flex items-center justify-center h-20">
+                  <p>No notifications yet.</p>
+                </div>
+              )}
+              {notifications.map((notification) => (
                 <div
                   className="w-full rounded-xl border border-line-hover bg-surface p-5"
-                  key={idx}
+                  key={notification.id}
                 >
                   <h2 className="text-base font-semibold text-ink">
                     {notification.title}
@@ -369,7 +381,7 @@ function App() {
                     {notification.detail}
                   </p>
                   <p className="mt-3 text-xs font-medium uppercase text-dim">
-                    {notification.time}
+                    {timeAgo(notification.createdAt)}
                   </p>
                 </div>
               ))}
