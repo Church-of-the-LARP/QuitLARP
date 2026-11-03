@@ -51,7 +51,7 @@ func (h *Handlers) registerAssessmentTests(api huma.API) {
 		Method:      http.MethodPost,
 		Path:        "/api/v1/assessments/{id}/tests",
 		Summary:     "Add a hidden test to an assessment",
-		Description: "The author of the assessment or an admin/superadmin may add a hidden test with its testing file. Candidates only ever see the name and description.",
+		Description: "The author of the assessment or an admin may add a hidden test with its testing file. Candidates only ever see the name and description.",
 	}, func(ctx context.Context, input *AddTestInput) (*TestOutput, error) {
 		if err := h.requireManageableAssessment(ctx, input.AssessmentID); err != nil {
 			return nil, err
@@ -91,7 +91,7 @@ func (h *Handlers) registerAssessmentTests(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/assessments/{id}/tests/{testId}",
 		Summary:     "Get a hidden test (author or admin)",
-		Description: "Restricted to the author of the assessment or an admin/superadmin: returns the hidden testing file. Everyone else may only see the test summaries on the assessment detail.",
+		Description: "Restricted to the author of the assessment or an admin: returns the hidden testing file. Everyone else may only see the test summaries on the assessment detail.",
 	}, func(ctx context.Context, input *TestPathInput) (*TestOutput, error) {
 		t, err := database.GetTest(ctx, h.db, input.TestID)
 		if err != nil || t.AssessmentID != input.AssessmentID {
@@ -115,7 +115,7 @@ func (h *Handlers) registerAssessmentTests(api huma.API) {
 		Method:      http.MethodPatch,
 		Path:        "/api/v1/assessments/{id}/tests/{testId}",
 		Summary:     "Update a hidden test",
-		Description: "The author of the assessment or an admin/superadmin may change the test name, description or hidden testing file.",
+		Description: "The author of the assessment or an admin may change the test name, description or hidden testing file.",
 	}, func(ctx context.Context, input *PatchTestInput) (*TestOutput, error) {
 		t, err := database.GetTest(ctx, h.db, input.TestID)
 		if err != nil || t.AssessmentID != input.AssessmentID {
@@ -170,7 +170,7 @@ func (h *Handlers) registerAssessmentTests(api huma.API) {
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/assessments/{id}/tests/{testId}",
 		Summary:     "Delete a hidden test",
-		Description: "The author of the assessment or an admin/superadmin may remove a hidden test.",
+		Description: "The author of the assessment or an admin may remove a hidden test.",
 	}, func(ctx context.Context, input *TestPathInput) (*struct{}, error) {
 		t, err := database.GetTest(ctx, h.db, input.TestID)
 		if err != nil || t.AssessmentID != input.AssessmentID {

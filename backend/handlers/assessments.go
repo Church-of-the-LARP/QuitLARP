@@ -84,7 +84,7 @@ func normalizeDraft(in models.AssessmentDraft) (models.AssessmentDraft, error) {
 }
 
 // requireManageableAssessment checks the caller is allowed to write to the
-// assessment: its author, or an admin/superadmin. The assessment must exist.
+// assessment: its author, or an admin. The assessment must exist.
 func (h *Handlers) requireManageableAssessment(ctx context.Context, id int64) error {
 	authorID, err := database.GetAssessmentAuthorID(ctx, h.db, id)
 	if err != nil {
@@ -98,8 +98,7 @@ func (h *Handlers) requireManageableAssessment(ctx context.Context, id int64) er
 	if err != nil {
 		return err
 	}
-	if (authorID != nil && *authorID == u.ID) ||
-		u.Role == models.RoleAdmin || u.Role == models.RoleSuperadmin {
+	if u.CanManageAssessment(authorID) {
 		return nil
 	}
 	return huma.NewError(http.StatusForbidden, "you do not have permission to do this")
@@ -230,9 +229,9 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Method:      http.MethodPost,
 		Path:        "/api/v1/assessments",
 		Summary:     "Create an assessment",
-		Description: "Requires authentication. Chapters and hidden tests may be included; unknown tag names are created automatically.",
+		Description: "Requires the moderator or admin role. Chapters and hidden tests may be included; unknown tag names are created automatically.",
 	}, func(ctx context.Context, input *CreateAssessmentInput) (*AssessmentOutput, error) {
-		u, err := h.requireUser(ctx)
+		u, err := h.requireUser(ctx, models.RoleModerator, models.RoleAdmin)
 		if err != nil {
 			return nil, err
 		}
@@ -279,7 +278,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/assessments/{id}/repo",
 		Summary:     "Get the git repository of an assessment",
-		Description: "The author of the assessment or an admin/superadmin may read the repository that backs it; the link is where the assignment content gets pushed.",
+		Description: "The author of the assessment or an admin may read the repository that backs it; the link is where the assignment content gets pushed.",
 	}, func(ctx context.Context, input *struct {
 		ID int64 `path:"id" example:"1" doc:"Assessment id"`
 	}) (*AssessmentRepoOutput, error) {
@@ -299,7 +298,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Method:      http.MethodPatch,
 		Path:        "/api/v1/assessments/{id}",
 		Summary:     "Update an assessment",
-		Description: "The author of the assessment or an admin/superadmin may update its scalar fields and template. Chapters, tests and tags have their own endpoints.",
+		Description: "The author of the assessment or an admin may update its scalar fields and template. Chapters, tests and tags have their own endpoints.",
 	}, func(ctx context.Context, input *PatchAssessmentInput) (*AssessmentOutput, error) {
 		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err
@@ -357,7 +356,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/assessments/{id}",
 		Summary:     "Delete an assessment",
-		Description: "The author of the assessment or an admin/superadmin may delete it; its chapters, tests and tag links are removed with it.",
+		Description: "The author of the assessment or an admin may delete it; its chapters, tests and tag links are removed with it.",
 	}, func(ctx context.Context, input *struct {
 		ID int64 `path:"id" example:"1" doc:"Assessment id to delete"`
 	}) (*struct{}, error) {
@@ -377,7 +376,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Method:      http.MethodPut,
 		Path:        "/api/v1/assessments/{id}/tags",
 		Summary:     "Replace the tags of an assessment",
-		Description: "The author of the assessment or an admin/superadmin may set its full tag list. Unknown tag names are created automatically.",
+		Description: "The author of the assessment or an admin may set its full tag list. Unknown tag names are created automatically.",
 	}, func(ctx context.Context, input *ReplaceAssessmentTagsInput) (*AssessmentOutput, error) {
 		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err

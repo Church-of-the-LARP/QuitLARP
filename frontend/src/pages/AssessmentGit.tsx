@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import client, { getErrorText } from '../scripts/api';
+import useAuth from '../scripts/useAuth.tsx';
 import usePageTitle from '../scripts/usePageTitle.ts';
 
 type Entry = {
@@ -28,6 +29,7 @@ const formatSize = (bytes: number) => {
 
 export default function AssessmentGit() {
   usePageTitle('Assessment files');
+  const { user } = useAuth();
   const params = useParams();
   const id = Number(params.id);
 
@@ -243,9 +245,11 @@ export default function AssessmentGit() {
         </div>
       )}
 
-      <Link to="/create" className="text-sm font-semibold text-accent-light hover:text-accent-lighter">
-        Create another assessment
-      </Link>
+      {(user?.role === 'moderator' || user?.role === 'admin') && (
+        <Link to="/create" className="text-sm font-semibold text-accent-light hover:text-accent-lighter">
+          Create another assessment
+        </Link>
+      )}
 
       <Link
         to={`/assessments/${id}/preview`}

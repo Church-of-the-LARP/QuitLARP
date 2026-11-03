@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -23,20 +22,20 @@ type UsersOutput struct {
 type UpdateUserRoleInput struct {
 	ID   int64 `path:"id" example:"1" doc:"User id to change"`
 	Body struct {
-		Role models.Role `json:"role" enum:"user,admin,superadmin" doc:"New role"`
+		Role models.Role `json:"role" enum:"user,moderator,admin" doc:"New role"`
 	}
 }
 
 func (h *Handlers) registerUsers(api huma.API) {
-	// GET /api/v1/users — any admin or the superadmin.
+	// GET /api/v1/users — admins only.
 	huma.Register(api, huma.Operation{
 		OperationID: "listUsers",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/users",
-		Summary:     "List users (admin or superadmin)",
-		Description: "Requires the caller to hold the admin or superadmin role.",
+		Summary:     "List users (admin only)",
+		Description: "Requires the caller to hold the admin role.",
 	}, func(ctx context.Context, _ *struct{}) (*UsersOutput, error) {
-		if _, err := h.requireUser(ctx, models.RoleAdmin, models.RoleSuperadmin); err != nil {
+		if _, err := h.requireUser(ctx, models.RoleAdmin); err != nil {
 			return nil, err
 		}
 		users, err := database.ListUsers(ctx, h.db)
@@ -49,21 +48,21 @@ func (h *Handlers) registerUsers(api huma.API) {
 		return resp, nil
 	})
 
-	// PATCH /api/v1/users/{id}/role — only the bootstrap superadmin.
+	// PATCH /api/v1/users/{id}/role — admins may assign any supported role.
 	huma.Register(api, huma.Operation{
 		OperationID: "updateUserRole",
 		Method:      http.MethodPatch,
 		Path:        "/api/v1/users/{id}/role",
-		Summary:     "Change a user's role (superadmin only)",
-		Description: "Only the superadmin defined via SUPERADMIN_* env vars may change roles, and only that account may hold the superadmin role.",
+		Summary:     "Change a user's role (admin only)",
+		Description: "An admin may assign the user, moderator, or admin role to any account.",
 	}, func(ctx context.Context, input *UpdateUserRoleInput) (*UserOutput, error) {
-		if _, err := h.requireUser(ctx, models.RoleSuperadmin); err != nil {
+		if _, err := h.requireUser(ctx, models.RoleAdmin); err != nil {
 			return nil, err
 		}
 
 		newRole, ok := models.ParseRole(string(input.Body.Role))
 		if !ok {
-			return nil, huma.NewError(http.StatusUnprocessableEntity, "role must be one of: user, admin, superadmin")
+			return nil, huma.NewError(http.StatusUnprocessableEntity, "role must be one of: user, moderator, admin")
 		}
 
 		target, err := database.GetUserByID(ctx, h.db, input.ID)
@@ -74,16 +73,6 @@ func (h *Handlers) registerUsers(api huma.API) {
 			log.Printf("update role lookup: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not update role")
 		}
-		// Keep the bootstrap superadmin singular: it cannot be demoted and
-		// nobody else may be promoted into its role.
-		isBootstrap := strings.EqualFold(target.Username, h.cfg.Superadmin.Username)
-		if newRole == models.RoleSuperadmin && !isBootstrap {
-			return nil, huma.NewError(http.StatusForbidden, "only the configured superadmin may hold the superadmin role")
-		}
-		if isBootstrap && newRole != models.RoleSuperadmin {
-			return nil, huma.NewError(http.StatusForbidden, "the configured superadmin cannot be demoted")
-		}
-
 		if err := database.SetUserRole(ctx, h.db, target.ID, newRole); err != nil {
 			log.Printf("update role: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not update role")

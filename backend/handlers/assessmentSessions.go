@@ -218,7 +218,7 @@ func (h *Handlers) registerAssessmentSessions(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/assessments/{id}/solutions",
 		Summary:     "List the solutions of an assessment",
-		Description: "The author of the assessment or an admin/superadmin may list every stored solution with its solver and visibility.",
+		Description: "The author of the assessment or an admin may list every stored solution with its solver and visibility.",
 	}, func(ctx context.Context, input *assessmentIDInput) (*SolveSolutionListOutput, error) {
 		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err

@@ -7,15 +7,15 @@ import "time"
 type Role string
 
 const (
-	RoleUser       Role = "user"
-	RoleAdmin      Role = "admin"
-	RoleSuperadmin Role = "superadmin"
+	RoleUser      Role = "user"
+	RoleModerator Role = "moderator"
+	RoleAdmin     Role = "admin"
 )
 
 // Valid reports whether r is one of the known roles.
 func (r Role) Valid() bool {
 	switch r {
-	case RoleUser, RoleAdmin, RoleSuperadmin:
+	case RoleUser, RoleModerator, RoleAdmin:
 		return true
 	}
 	return false
@@ -34,10 +34,19 @@ type User struct {
 	Username      string    `json:"username" db:"username" doc:"Unique display/account name"`
 	Email         string    `json:"email" db:"email" doc:"Login email address"`
 	EmailVerified bool      `json:"emailVerified" db:"email_verified" doc:"Whether the email address was confirmed"`
-	Role          Role      `json:"role" db:"role" enum:"user,admin,superadmin" doc:"Authorization role"`
+	Role          Role      `json:"role" db:"role" enum:"user,moderator,admin" doc:"Authorization role"`
 	GoogleLinked  bool      `json:"googleLinked" db:"google_linked" doc:"Whether a Google account is linked"`
 	CreatedAt     time.Time `json:"createdAt" db:"created_at" doc:"Account creation time"`
 	UpdatedAt     time.Time `json:"updatedAt" db:"updated_at" doc:"Last modification time"`
+}
+
+// CanManageAssessment reports whether the user may edit an assessment and its
+// repository: admins may manage any assessment; moderators only their own.
+func (u User) CanManageAssessment(authorID *int64) bool {
+	if u.Role == RoleAdmin {
+		return true
+	}
+	return u.Role == RoleModerator && authorID != nil && *authorID == u.ID
 }
 
 // UserColumns is the SELECT list used everywhere a User is scanned; it maps

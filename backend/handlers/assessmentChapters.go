@@ -53,7 +53,7 @@ func (h *Handlers) registerAssessmentChapters(api huma.API) {
 		Method:      http.MethodPost,
 		Path:        "/api/v1/assessments/{id}/chapters",
 		Summary:     "Add a chapter to an assessment",
-		Description: "The author of the assessment or an admin/superadmin may append a chapter; it is placed after the current last one.",
+		Description: "The author of the assessment or an admin may append a chapter; it is placed after the current last one.",
 	}, func(ctx context.Context, input *AddChapterInput) (*ChapterOutput, error) {
 		if err := h.requireManageableAssessment(ctx, input.AssessmentID); err != nil {
 			return nil, err
@@ -89,7 +89,7 @@ func (h *Handlers) registerAssessmentChapters(api huma.API) {
 		Method:      http.MethodPatch,
 		Path:        "/api/v1/assessments/{id}/chapters/{chapterId}",
 		Summary:     "Update a chapter",
-		Description: "The author of the assessment or an admin/superadmin may change the chapter title, description, time limit and position.",
+		Description: "The author of the assessment or an admin may change the chapter title, description, time limit and position.",
 	}, func(ctx context.Context, input *PatchChapterInput) (*ChapterOutput, error) {
 		ch, err := database.GetChapter(ctx, h.db, input.ChapterID)
 		if err != nil {
@@ -150,7 +150,7 @@ func (h *Handlers) registerAssessmentChapters(api huma.API) {
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/assessments/{id}/chapters/{chapterId}",
 		Summary:     "Delete a chapter",
-		Description: "The author of the assessment or an admin/superadmin may remove a chapter.",
+		Description: "The author of the assessment or an admin may remove a chapter.",
 	}, func(ctx context.Context, input *DeleteChapterInput) (*struct{}, error) {
 		ch, err := database.GetChapter(ctx, h.db, input.ChapterID)
 		if err != nil {

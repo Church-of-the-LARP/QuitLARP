@@ -350,9 +350,9 @@ var errNoAssessmentRepo = errors.New("no assessment backs this repository")
 // assessment repository.
 var errAssessmentRepoForbidden = errors.New("forbidden")
 
-// authorizeAssessmentRepo allows the author of an assessment, or an
-// admin/superadmin, to use its repository. Everything else, including an
-// assessment id with no row behind it, is refused so a push cannot lazily
+// authorizeAssessmentRepo allows the author of an assessment or an admin to
+// use its repository. Everything else, including an assessment id with no
+// row behind it, is refused so a push cannot lazily
 // create a repository for an assessment that does not exist.
 func (h *Handlers) authorizeAssessmentRepo(ctx context.Context, u models.User, id int64) error {
 	authorID, err := database.GetAssessmentAuthorID(ctx, h.db, id)
@@ -362,8 +362,7 @@ func (h *Handlers) authorizeAssessmentRepo(ctx context.Context, u models.User, i
 		}
 		return fmt.Errorf("assessment author lookup: %w", err)
 	}
-	if (authorID != nil && *authorID == u.ID) ||
-		u.Role == models.RoleAdmin || u.Role == models.RoleSuperadmin {
+	if u.CanManageAssessment(authorID) {
 		return nil
 	}
 	return errAssessmentRepoForbidden
@@ -405,8 +404,7 @@ func (h *Handlers) authorizeSolutionRepo(ctx context.Context, u models.User, ass
 		}
 		return fmt.Errorf("solution assessment lookup: %w", err)
 	}
-	if (authorID != nil && *authorID == u.ID) ||
-		u.Role == models.RoleAdmin || u.Role == models.RoleSuperadmin {
+	if u.CanManageAssessment(authorID) {
 		return nil
 	}
 	solution, err := database.GetSolution(ctx, h.db, assessmentID, solverID)
