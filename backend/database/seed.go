@@ -9,6 +9,7 @@ import (
 	"github.com/pressly/goose/v3"
 
 	"backend/auth"
+	"backend/models"
 )
 
 //go:embed migrations/*.sql
@@ -25,13 +26,21 @@ func Migrate(db *sqlx.DB) error {
 }
 
 // SeedAdmin guarantees the configured bootstrap admin account exists. It
-// creates the account with the admin role on first boot. Existing role changes
-// are preserved; the password is only set on creation.
+// creates the account with the admin role on first boot and re-asserts that role
+// if it has drifted. Other users' roles are never touched; the password is only
+// set on creation.
 func SeedAdmin(ctx context.Context, db *sqlx.DB, username, email, password string) error {
 	existing, err := GetUserByUsername(ctx, db, username)
 	switch {
 	case err == nil:
-		// Preserve admin-assigned roles; only synchronize configured identity fields.
+		// The bootstrap account must always be an admin so a bad role change
+		// is recoverable with a restart; also synchronize identity fields.
+		if existing.Role != models.RoleAdmin {
+			if err := SetUserRole(ctx, db, existing.ID, models.RoleAdmin); err != nil {
+				return err
+			}
+			log.Printf("bootstrap admin account %q role restored to admin", username)
+		}
 		if !existing.EmailVerified || existing.Email != email {
 			if _, err := db.ExecContext(ctx, `
 				UPDATE users

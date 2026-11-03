@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -56,7 +57,8 @@ func (h *Handlers) registerUsers(api huma.API) {
 		Summary:     "Change a user's role (admin only)",
 		Description: "An admin may assign the user, moderator, or admin role to any account.",
 	}, func(ctx context.Context, input *UpdateUserRoleInput) (*UserOutput, error) {
-		if _, err := h.requireUser(ctx, models.RoleAdmin); err != nil {
+		caller, err := h.requireUser(ctx, models.RoleAdmin)
+		if err != nil {
 			return nil, err
 		}
 
@@ -73,6 +75,17 @@ func (h *Handlers) registerUsers(api huma.API) {
 			log.Printf("update role lookup: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not update role")
 		}
+		// The configured bootstrap admin can never be demoted, and no admin
+		// may demote themselves (so the last admin cannot lock everyone out).
+		if newRole != models.RoleAdmin {
+			if strings.EqualFold(target.Username, h.cfg.Admin.Username) {
+				return nil, huma.NewError(http.StatusForbidden, "the configured bootstrap admin cannot be demoted")
+			}
+			if target.ID == caller.ID {
+				return nil, huma.NewError(http.StatusForbidden, "admins cannot demote themselves")
+			}
+		}
+
 		if err := database.SetUserRole(ctx, h.db, target.ID, newRole); err != nil {
 			log.Printf("update role: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not update role")
