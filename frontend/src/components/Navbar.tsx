@@ -5,10 +5,10 @@ type NavbarProps = {
   user: {
     username: string;
     email: string;
-    role: "user" | "admin" | "superadmin";
+    role: "user" | "moderator" | "admin";
   };
   isAdmin: boolean;
-  roleStyles: Record<"user" | "admin" | "superadmin", string>;
+  roleStyles: Record<"user" | "moderator" | "admin", string>;
   handleLogout: () => void;
 }
 
@@ -16,18 +16,10 @@ export default function Navbar({ user, isAdmin, roleStyles, handleLogout }: Navb
   return (
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-[75vw] items-center justify-between py-3">
-        <div className="flex items-center gap-4">
+        <div>
           <Link to="/" className="text-ink">
             <Logo className="h-6 w-auto" />
           </Link>
-          {isAdmin && (
-            <Link
-              to="/users"
-              className="text-sm text-muted hover:text-ink"
-            >
-              Users
-            </Link>
-          )}
         </div>
         <div className="flex items-center gap-6">
           <span className="hidden text-sm text-muted sm:inline">
@@ -35,11 +27,21 @@ export default function Navbar({ user, isAdmin, roleStyles, handleLogout }: Navb
             <span className="mx-1.5 text-dim">·</span>
             {user.email}
           </span>
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${roleStyles[user.role]}`}
-          >
-            {user.role}
-          </span>
+          {isAdmin ? (
+            <Link
+              to="/admin"
+              aria-label="Open admin page"
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold hover:ring-1 hover:ring-current ${roleStyles[user.role]}`}
+            >
+              {user.role}
+            </Link>
+          ) : (
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${roleStyles[user.role]}`}
+            >
+              {user.role}
+            </span>
+          )}
           <button
             onClick={() => handleLogout()}
             className="text-sm font-semibold text-ink py-2 px-4 rounded-2xl bg-surface hover:bg-raised transition-colors"
