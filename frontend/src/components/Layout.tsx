@@ -22,7 +22,7 @@ export default function Layout() {
 
   return (
     <>
-      <div className="min-h-screen bg-shell">
+      <div className="min-h-screen bg-glow">
         <Navbar
           user={user}
           isAdmin={isAdmin}

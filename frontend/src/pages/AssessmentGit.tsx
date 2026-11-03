@@ -130,20 +130,20 @@ export default function AssessmentGit() {
   };
 
   return (
-    <main className="mx-auto flex w-[60vw] flex-col gap-5 py-6">
+    <main className="mx-auto flex w-[calc(100%-2rem)] md:w-[60vw] flex-col gap-5 py-6">
       <div>
         <p className="mb-2 text-xs font-semibold uppercase text-accent-light">Repository</p>
         <h1 className="text-3xl font-bold text-ink">Files</h1>
       </div>
 
       {forbidden ? (
-        <div className="rounded-xl border border-line-hover bg-surface p-6 text-muted">
+        <div className="rounded-xl bg-surface p-6 text-muted">
           Only the author or an admin can browse this repository.
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-line-hover bg-surface p-6 text-danger">{error}</div>
+        <div className="rounded-xl bg-surface p-6 text-danger">{error}</div>
       ) : (
-        <div className="flex flex-col gap-4 rounded-xl border border-line-hover bg-surface p-6">
+        <div className="flex flex-col gap-4 rounded-xl bg-surface p-6">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <button
               type="button"
@@ -204,7 +204,7 @@ export default function AssessmentGit() {
                   This file is too large to display ({formatSize(file.size)}).
                 </p>
               ) : (
-                <pre className="max-h-[70vh] overflow-auto rounded-lg border border-line-hover bg-panel p-4 font-mono text-sm leading-relaxed text-muted">
+                <pre className="max-h-[70vh] overflow-auto rounded-lg bg-panel p-4 font-mono text-sm leading-relaxed text-muted">
                   {file?.content ?? ''}
                 </pre>
               )}
@@ -212,7 +212,7 @@ export default function AssessmentGit() {
           ) : entries.length === 0 ? (
             <p className="text-muted">This directory is empty.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-line-hover">
+            <ul className="flex flex-col">
               {entries.map((entry) => (
                 <li key={entry.name}>
                   {entry.type === 'tree' ? (

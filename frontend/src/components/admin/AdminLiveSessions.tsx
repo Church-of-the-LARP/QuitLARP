@@ -14,7 +14,7 @@ export default function AdminLiveSessions({ sessions, busyId, onEnd }: Props) {
   return (
     <section>
       <h2 className="mb-3 text-xl font-semibold">Live assessment sessions</h2>
-      <div className="overflow-x-auto rounded-xl border border-line-hover">
+      <div className="overflow-x-auto rounded-xl">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-panel text-xs uppercase text-muted">
             <tr>
@@ -25,7 +25,7 @@ export default function AdminLiveSessions({ sessions, busyId, onEnd }: Props) {
               <th className="px-4 py-3">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line bg-surface">
+          <tbody className=" bg-surface">
             {sessions.map((session) => (
               <tr key={session.id}>
                 <td className="px-4 py-3">

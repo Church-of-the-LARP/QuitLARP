@@ -39,7 +39,7 @@ export default function AdminAssessments({
           Create assessment
         </Link>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-line-hover">
+      <div className="overflow-x-auto rounded-xl">
         <table className="w-full min-w-[680px] text-left text-sm">
           <thead className="bg-panel text-xs uppercase text-muted">
             <tr>
@@ -49,7 +49,7 @@ export default function AdminAssessments({
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line bg-surface">
+          <tbody className=" bg-surface">
             {assessments.map((assessment) => (
               <tr key={assessment.id}>
                 <td className="px-4 py-3">
@@ -58,7 +58,7 @@ export default function AdminAssessments({
                       <input
                         value={titleDraft}
                         onChange={(event) => setTitleDraft(event.target.value)}
-                        className="w-full rounded border border-line-hover bg-panel px-2 py-1"
+                        className="w-full rounded bg-panel px-2 py-1"
                         aria-label="Assessment title"
                       />
                     ) : (

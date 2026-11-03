@@ -122,13 +122,13 @@ export default function Admin() {
         </div>
         <button
           onClick={() => void refresh()}
-          className="rounded-lg border border-line-hover bg-surface px-4 py-2 text-sm hover:bg-raised"
+          className="rounded-lg bg-surface px-4 py-2 text-sm hover:bg-raised"
         >
           Refresh data
         </button>
       </div>
       <nav
-        className="mb-6 flex flex-wrap gap-2 border-b border-line pb-3"
+        className="mb-6 flex flex-wrap gap-2 pb-3"
         aria-label="Admin sections"
       >
         {tabs.map((item) => (

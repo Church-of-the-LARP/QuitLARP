@@ -12,7 +12,7 @@ export default function AdminSubmissions({ submissions }: Props) {
   return (
     <section>
       <h2 className="mb-3 text-xl font-semibold">Submitted assessments</h2>
-      <div className="overflow-x-auto rounded-xl border border-line-hover">
+      <div className="overflow-x-auto rounded-xl">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-panel text-xs uppercase text-muted">
             <tr>
@@ -23,7 +23,7 @@ export default function AdminSubmissions({ submissions }: Props) {
               <th className="px-4 py-3">Repository</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line bg-surface">
+          <tbody className=" bg-surface">
             {submissions.map((submission) => (
               <tr key={submission.id}>
                 <td className="px-4 py-3">

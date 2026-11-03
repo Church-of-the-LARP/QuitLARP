@@ -94,7 +94,7 @@ export default function AdminUsers() {
         </div>
         <span className="text-xs text-dim">{users.length} total</span>
       </div>
-      <ul className="mt-3 divide-y divide-line rounded-md border border-line-hover bg-surface">
+      <ul className="mt-3 rounded-md bg-surface">
         {users.map((target) => (
           <li
             key={target.id}
@@ -126,7 +126,7 @@ export default function AdminUsers() {
                   if (isRole(role)) void handleRoleChange(target, role);
                 }}
                 aria-label={`Role for ${target.username}`}
-                className="scheme-dark appearance-none rounded-md border border-line-hover bg-panel py-1 pl-2.5 pr-8 text-xs font-medium text-ink transition-colors hover:bg-raised focus:border-accent focus:bg-raised focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-50"
+                className="scheme-dark appearance-none rounded-md bg-panel py-1 pl-2.5 pr-8 text-xs font-medium text-ink transition-colors hover:bg-raised focus:bg-raised focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-50"
               >
                 {roles.map((role) => (
                   <option key={role} value={role} className="bg-panel text-ink">

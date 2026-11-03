@@ -2,19 +2,19 @@
 
 @theme {
   /* text */
-  --color-ink: var(--color-stone-100); /* primary text */
-  --color-muted: var(--color-stone-400); /* secondary/helper text */
-  --color-dim: var(--color-stone-500); /* disabled/least-important text */
+  --color-ink: var(--color-mist-100); /* primary text */
+  --color-muted: var(--color-mist-400); /* secondary/helper text */
+  --color-dim: var(--color-mist-500); /* disabled/least-important text */
 
   /* backgrounds */
-  --color-shell: var(--color-stone-950); /* page/root background */
-  --color-panel: var(--color-stone-900); /* nav header, auth card container */
-  --color-surface: var(--color-stone-800); /* card/sidebar background */
-  --color-raised: var(--color-stone-700); /* hover backgrounds, subtle pills */
+  --color-shell: var(--color-mist-950); /* page/root background */
+  --color-panel: var(--color-mist-900); /* nav header, auth card container */
+  --color-surface: var(--color-mist-800); /* card/sidebar background */
+  --color-raised: var(--color-mist-700); /* hover backgrounds, subtle pills */
 
   /* borders */
-  --color-line: var(--color-stone-800); /* default border/divider */
-  --color-line-hover: var(--color-stone-700); /* hover/emphasis border */
+  --color-line: var(--color-mist-800); /* default border/divider */
+  --color-line-hover: var(--color-mist-700); /* hover/emphasis border */
 
   /* primary accent (olive) */
   --color-accent: var(--color-olive-500); /* buttons, focus ring, active state */
@@ -26,11 +26,11 @@
   --color-accent-secondary-hover: var(--color-mauve-400);
 
   /* semantic status (muted toward the accent palette, still identifiable) */
-  --color-success: oklch(74% 0.09 163);
-  --color-warning: oklch(78% 0.09 84);
-  --color-warning-light: oklch(85% 0.08 90);
-  --color-danger: oklch(70% 0.09 15);
-  --color-danger-light: oklch(80% 0.07 15);
+  --color-success: oklch(62% 0.09 163);
+  --color-warning: oklch(66% 0.09 84);
+  --color-warning-light: oklch(74% 0.08 90);
+  --color-danger: oklch(58% 0.09 15);
+  --color-danger-light: oklch(68% 0.07 15);
 }
 
 @layer base {
@@ -38,5 +38,17 @@
   body,
   #root {
     @apply bg-shell text-ink;
+  }
+}
+
+@layer utilities {
+  .bg-glow {
+    background-color: var(--color-shell);
+    background-image: radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      color-mix(in oklab, var(--color-accent) 18%, transparent),
+      transparent 70%
+    );
+    background-repeat: no-repeat;
   }
 }

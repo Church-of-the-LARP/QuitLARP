@@ -6,7 +6,7 @@ import Alert from '../components/Alert.tsx';
 import usePageTitle from '../scripts/usePageTitle.ts';
 
 const inputClass =
-  'w-full rounded-xl border border-line-hover bg-panel px-3 py-2 text-ink outline-none placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30';
+  'w-full rounded-xl bg-panel px-3 py-2 text-ink outline-none placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30';
 
 type RepoState = {
   id: number;
@@ -104,11 +104,11 @@ export default function Create() {
   };
 
   return (
-    <main className="mx-auto w-[60vw] flex flex-col gap-5 py-6">
+    <main className="mx-auto w-[calc(100%-2rem)] md:w-[60vw] flex flex-col gap-5 py-6">
       <h1 className="font-bold text-3xl mb-6 text-ink">Create assessment</h1>
 
       {repo ? (
-        <div className="rounded-xl border border-line-hover bg-surface p-6 flex flex-col gap-5">
+        <div className="rounded-xl bg-surface p-6 flex flex-col gap-5">
           <div>
             <h2 className="text-lg font-semibold text-ink">Assessment created</h2>
             <p className="mt-1 text-sm text-muted">Assessment id {repo.id}</p>
@@ -168,7 +168,7 @@ export default function Create() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <div className="rounded-xl border border-line-hover bg-surface p-6 flex flex-col gap-4">
+          <div className="rounded-xl bg-surface p-6 flex flex-col gap-4">
             <div>
               <label className="mb-1 block font-semibold text-muted" htmlFor="assessment-name">
                 Assessment name

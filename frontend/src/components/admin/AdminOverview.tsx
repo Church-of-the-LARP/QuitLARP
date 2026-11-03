@@ -34,7 +34,7 @@ function CountCard({
   return (
     <button
       onClick={() => onSelect(tab)}
-      className="rounded-xl border border-line-hover bg-surface p-5 text-left transition hover:border-accent/50 hover:bg-raised/50"
+      className="rounded-xl bg-surface p-5 text-left transition hover:bg-raised/50"
     >
       <div className="text-xs font-semibold uppercase tracking-wide text-muted">
         {label}
@@ -101,7 +101,7 @@ export default function AdminOverview({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-line-hover bg-surface p-5">
+        <section className="rounded-xl bg-surface p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h3 className="font-semibold">Live gVisor sessions</h3>
@@ -127,7 +127,7 @@ export default function AdminOverview({
                     <th className="pb-2 font-medium">Started</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line">
+                <tbody className="">
                   {latestSessions.map((session) => (
                     <tr key={session.id}>
                       <td className="py-3 pr-4 font-medium text-ink">
@@ -154,7 +154,7 @@ export default function AdminOverview({
           )}
         </section>
 
-        <section className="rounded-xl border border-line-hover bg-surface p-5">
+        <section className="rounded-xl bg-surface p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h3 className="font-semibold">Recent submissions</h3>
@@ -170,7 +170,7 @@ export default function AdminOverview({
             </button>
           </div>
           {latestSubmissions.length ? (
-            <ul className="divide-y divide-line">
+            <ul className="">
               {latestSubmissions.map((submission) => (
                 <li
                   key={submission.id}

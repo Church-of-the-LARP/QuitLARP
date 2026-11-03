@@ -4,11 +4,11 @@ import Logo from "./Logo.tsx";
 export default function LandingNavbar() {
   return (
     <header className="relative z-20 border-b border-line bg-panel shadow-lg shadow-black/30">
-      <div className="mx-auto flex w-[75vw] items-center justify-between py-3">
+      <div className="mx-auto flex w-[calc(100%-2rem)] sm:w-[75vw] flex-wrap items-center justify-between gap-y-2 py-3">
         <Link to="/" className="text-ink">
           <Logo className="h-6 w-auto" />
         </Link>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <Link
             to="/login"
             className="text-sm font-semibold text-ink py-2 px-4 rounded-2xl hover:bg-surface transition-colors"
