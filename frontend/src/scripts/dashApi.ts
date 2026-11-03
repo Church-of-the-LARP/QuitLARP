@@ -40,9 +40,7 @@ export async function getAssessments(
 
 export type ScheduledAssessment = components["schemas"]["ScheduledAssessment"];
 
-export async function getScheduled(
-  limit?: number,
-): Promise<ScheduledAssessment[]> {
+export async function getScheduled(limit?: number): Promise<ScheduledAssessment[]> {
   const { data, error } = await client.GET("/api/v1/scheduled-assessments", {
     params: { query: { limit } },
   });
