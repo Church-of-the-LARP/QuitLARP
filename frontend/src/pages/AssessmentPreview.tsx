@@ -114,9 +114,9 @@ export default function AssessmentPreview() {
 
   return (
     <div className="flex flex-col items-center flex-1 py-20 px-4 sm:px-6 lg:px-8 w-screen">
-      <div className="flex w-full max-w-4xl justify-between items-center">
+      <div className="flex w-full max-w-4xl flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div className="flex flex-col">
-          <div className="flex">
+          <div className="flex flex-wrap">
             <h1 className="text-2xl font-bold text-ink">
               {assessment.title} : &nbsp;
             </h1>
@@ -127,8 +127,8 @@ export default function AssessmentPreview() {
             </h1>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex flex-row items-center gap-4">
+        <div className="flex flex-col sm:items-end gap-2">
+          <div className="flex flex-row flex-wrap items-center gap-3 sm:gap-4">
             <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
               leaderboard & solutions
             </button>
@@ -149,8 +149,8 @@ export default function AssessmentPreview() {
           )}
         </div>
       </div>
-      <div className="mt-8 flex w-full max-w-4xl gap-6 bg-panel rounded-xl p-6">
-        <aside className="flex flex-col gap-3 w-1/3 border-r border-line pr-4">
+      <div className="mt-8 flex w-full max-w-4xl flex-col md:flex-row gap-6 bg-panel rounded-xl p-6">
+        <aside className="flex flex-col gap-3 w-full md:w-1/3 md:border-r border-b md:border-b-0 border-line pb-4 md:pb-0 md:pr-4">
           <p className="text-xs font-semibold uppercase text-accent-light">
             Files
           </p>
@@ -225,7 +225,7 @@ export default function AssessmentPreview() {
           </div>
         </aside>
 
-        <main className="flex w-2/3 flex-col gap-3">
+        <main className="flex w-full min-w-0 md:w-2/3 flex-col gap-3">
           <p className="font-mono text-xs text-dim">
             {activeLabel} ({activeTimeLimit} min)
           </p>

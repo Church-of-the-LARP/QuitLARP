@@ -54,7 +54,7 @@ function App() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-shell px-6">
-      <div className="w-126 rounded-xl border border-line bg-panel p-8 shadow-sm">
+      <div className="w-full max-w-126 rounded-xl border border-line bg-panel p-8 shadow-sm">
         <div className="mb-6 flex items-center justify-center gap-2">
           <Logo className="h-6 w-auto" />
         </div>

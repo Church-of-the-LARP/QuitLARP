@@ -104,7 +104,7 @@ export default function Create() {
   };
 
   return (
-    <main className="mx-auto w-[60vw] flex flex-col gap-5 py-6">
+    <main className="mx-auto w-[calc(100%-2rem)] md:w-[60vw] flex flex-col gap-5 py-6">
       <h1 className="font-bold text-3xl mb-6 text-ink">Create assessment</h1>
 
       {repo ? (

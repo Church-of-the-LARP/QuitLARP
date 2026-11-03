@@ -128,7 +128,7 @@ export default function AssessmentGit() {
   };
 
   return (
-    <main className="mx-auto flex w-[60vw] flex-col gap-5 py-6">
+    <main className="mx-auto flex w-[calc(100%-2rem)] md:w-[60vw] flex-col gap-5 py-6">
       <div>
         <p className="mb-2 text-xs font-semibold uppercase text-accent-light">Repository</p>
         <h1 className="text-3xl font-bold text-ink">Files</h1>

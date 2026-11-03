@@ -12,6 +12,7 @@ import {
   type Difficulty,
   type TagCount,
 } from "../scripts/dashApi.ts";
+import { Link } from "react-router-dom";
 
 const notifications = [
   {
@@ -44,7 +45,7 @@ function VerifyEmailBanner({
   };
 
   return (
-    <div className="mb-6 rounded-md border border-warning bg-warning/80 px-4 py-3 text-sm text-shell">
+    <div className="mb-6 rounded-md bg-warning/80 px-4 py-3 text-sm text-shell">
       <p className="font-medium">Verify your email address</p>
       <p className="mt-0.5 text-shell/80">
         We emailed a verification link to{" "}
@@ -142,35 +143,35 @@ function App() {
   return (
     <>
       <div className="min-w-screen flex flex-col justify-center items-center">
-        <div className="max-w-3xl fixed top-12">
+        <div className="max-w-3xl fixed top-12 px-4 z-30">
           {!user.emailVerified && !closeEmail ? (
             <VerifyEmailBanner setCloseEmail={setCloseEmail} />
           ) : undefined}
         </div>
       </div>
 
-      <main className="mx-auto w-[75vw] flex flex-col gap-5 py-6">
+      <main className="mx-auto w-[calc(100%-2rem)] sm:w-[75vw] flex flex-col gap-5 py-6">
         <section className="mb-6">
           <p className="mb-2 text-xs font-semibold uppercase text-accent-light">
             Your progress
           </p>
           <h1 className="mb-6 text-3xl font-bold text-ink">User stats</h1>
-          <div className="flex gap-5 w-full h-60">
-            <div className="flex h-full w-full flex-col justify-center rounded-xl border border-line-hover bg-surface px-5 text-center">
+          <div className="flex flex-col sm:flex-row gap-5 w-full sm:h-60">
+            <div className="flex h-full w-full flex-col justify-center rounded-xl bg-surface px-5 py-5 text-center">
               <p className="text-sm font-semibold uppercase text-muted">
                 Completed
               </p>
               <p className="my-2 text-5xl font-bold text-ink">0</p>
               <p className="text-sm font-medium text-muted">tests</p>
             </div>
-            <div className="flex h-full w-full flex-col justify-center rounded-xl border border-line-hover bg-surface px-5 text-center">
+            <div className="flex h-full w-full flex-col justify-center rounded-xl bg-surface px-5 py-5 text-center">
               <p className="text-sm font-semibold uppercase text-muted">
                 In progress
               </p>
               <p className="my-2 text-5xl font-bold text-ink">0</p>
               <p className="text-sm font-medium text-muted">tests</p>
             </div>
-            <div className="flex h-full w-full flex-col justify-center rounded-xl border border-line-hover bg-surface px-5 text-center">
+            <div className="flex h-full w-full flex-col justify-center rounded-xl bg-surface px-5 py-5 text-center">
               <p className="text-sm font-semibold uppercase text-muted">
                 Average score
               </p>
@@ -189,7 +190,7 @@ function App() {
             {upcomingTests.length > 0 ? (
               upcomingTests.map((test, idx) => (
                 <div
-                  className="flex flex-col w-96 shrink-0 rounded-xl border border-line-hover bg-surface p-5 md:flex-row"
+                  className="flex flex-col w-72 sm:w-96 shrink-0 rounded-xl bg-surface p-5 md:flex-row"
                   key={idx}
                 >
                   <div className="w-full">
@@ -204,9 +205,12 @@ function App() {
                     </p>
                   </div>
                   <div className="w-full md:w-40 text-center content-center md:content-end md:text-end">
-                    <button className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell transition hover:bg-accent-light">
+                    <Link
+                      to={`/assessments/${test.assessmentId}/preview`}
+                      className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell transition hover:bg-accent-light"
+                    >
                       Take test
-                    </button>
+                    </Link>
                   </div>
                 </div>
               ))
@@ -218,8 +222,8 @@ function App() {
           </div>
         </section>
 
-        <div className="flex gap-5">
-          <section className="w-[70%]">
+        <div className="flex flex-col lg:flex-row gap-5">
+          <section className="w-full lg:w-[70%]">
             <p className="mb-2 text-xs font-semibold uppercase text-accent-light">
               Explore
             </p>
@@ -236,7 +240,7 @@ function App() {
                   type="text"
                   value={draft.q}
                   onChange={(e) => setDraft({ ...draft, q: e.target.value })}
-                  className="w-full rounded-lg border border-line-hover bg-panel px-3 py-2 text-sm text-ink outline-none transition placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30"
+                  className="w-full rounded-lg bg-panel px-3 py-2 text-sm text-ink outline-none transition placeholder:text-dim focus:ring-2 focus:ring-accent/30"
                   placeholder="Search for title"
                 />
               </div>
@@ -250,7 +254,7 @@ function App() {
                   onChange={(e) =>
                     setDraft({ ...draft, author: e.target.value })
                   }
-                  className="w-full rounded-lg border border-line-hover bg-panel px-3 py-2 text-sm text-ink outline-none transition placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30"
+                  className="w-full rounded-lg bg-panel px-3 py-2 text-sm text-ink outline-none transition placeholder:text-dim focus:ring-2 focus:ring-accent/30"
                   placeholder="Search for author"
                 />
               </div>
@@ -258,23 +262,36 @@ function App() {
                 <label className="text-sm font-semibold text-muted">
                   Difficulty
                 </label>
-                <select
-                  value={draft.difficulty}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      difficulty: e.target.value as Difficulty | "",
-                    })
-                  }
-                  className="w-full rounded-lg border border-line-hover bg-panel px-3 py-2 text-sm text-ink outline-none transition placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30"
-                >
-                  <option value="">Any</option>
-                  {difficulties.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={draft.difficulty}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        difficulty: e.target.value as Difficulty | "",
+                      })
+                    }
+                    className="w-full appearance-none rounded-lg bg-panel py-2 pl-3 pr-9 text-sm text-ink outline-none transition focus:ring-2 focus:ring-accent/30"
+                  >
+                    <option value="">Any</option>
+                    {difficulties.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    viewBox="0 0 12 12"
+                    className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-dim"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M2 4l4 4 4-4" />
+                  </svg>
+                </div>
               </div>
               <div className="flex flex-1 flex-col gap-1">
                 <label className="text-sm font-semibold text-muted">Tag</label>
@@ -283,7 +300,7 @@ function App() {
                   list="tag-options"
                   value={draft.tag}
                   onChange={(e) => setDraft({ ...draft, tag: e.target.value })}
-                  className="w-full rounded-lg border border-line-hover bg-panel px-3 py-2 text-sm text-ink outline-none transition placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30"
+                  className="w-full rounded-lg bg-panel px-3 py-2 text-sm text-ink outline-none transition placeholder:text-dim focus:ring-2 focus:ring-accent/30"
                   placeholder="Select or type a tag"
                 />
                 <datalist id="tag-options">
@@ -295,7 +312,7 @@ function App() {
               <button
                 type="button"
                 onClick={handleReset}
-                className="md:col-span-2 rounded-lg border border-line-hover px-4 py-2 text-sm font-semibold text-muted transition hover:text-ink"
+                className="md:col-span-2 rounded-lg bg-panel px-4 py-2 text-sm font-semibold text-muted transition hover:text-ink"
               >
                 Reset
               </button>
@@ -309,7 +326,7 @@ function App() {
             <div className="flex flex-col gap-5">
               {publicTests.map((test) => (
                 <div
-                  className="w-full rounded-xl border border-line-hover bg-surface p-5 flex flex-col md:flex-row"
+                  className="w-full rounded-xl bg-surface p-5 flex flex-col md:flex-row"
                   key={test.id}
                 >
                   <div className="w-full">
@@ -326,23 +343,26 @@ function App() {
                     </p>
                   </div>
                   <div className="w-full md:w-30 text-center content-center md:content-end md:text-end">
-                    <button className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell transition hover:bg-accent-light">
+                    <Link
+                      to={`/assessments/${test.id}/preview`}
+                      className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell transition hover:bg-accent-light"
+                    >
                       Take test
-                    </button>
+                    </Link>
                   </div>
                 </div>
               ))}
             </div>
             <div className="flex items-center justify-between gap-2 mt-5">
               <button
-                className="rounded-lg border border-line-hover bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent hover:text-shell disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface disabled:hover:text-ink"
+                className="rounded-lg bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent hover:text-shell disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface disabled:hover:text-ink"
                 disabled={offset <= 0}
                 onClick={() => setOffset((prev) => prev - 5)}
               >
                 «
               </button>
               <button
-                className="rounded-lg border border-line-hover bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent hover:text-shell disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface disabled:hover:text-ink"
+                className="rounded-lg bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent hover:text-shell disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface disabled:hover:text-ink"
                 disabled={offset + 5 >= testCount}
                 onClick={() => setOffset((prev) => prev + 5)}
               >
@@ -351,17 +371,14 @@ function App() {
             </div>
           </section>
 
-          <aside className="w-[30%]">
+          <aside className="w-full lg:w-[30%]">
             <p className="mb-2 text-xs font-semibold uppercase text-accent-light">
               Updates
             </p>
             <h1 className="mb-6 text-3xl font-bold text-ink">Notifications</h1>
             <div className="flex flex-col gap-5">
               {notifications.map((notification, idx) => (
-                <div
-                  className="w-full rounded-xl border border-line-hover bg-surface p-5"
-                  key={idx}
-                >
+                <div className="w-full rounded-xl bg-surface p-5" key={idx}>
                   <h2 className="text-base font-semibold text-ink">
                     {notification.title}
                   </h2>

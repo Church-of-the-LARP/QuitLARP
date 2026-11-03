@@ -27,6 +27,23 @@ services:
       timeout: 3s
       retries: 12
 
+  # Sandbox daemon for assessment sessions: dockerd with the gVisor (runsc)
+  # runtime registered. Needs --privileged to run its own containers. Only
+  # reachable from the compose network; nothing is published to the host.
+  dind:
+    build: ./sandbox
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: "" # plain TCP on 2375, internal network only
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    volumes:
+      - dind-data:/var/lib/docker
+
   backend:
     build:
       context: ./backend
@@ -39,6 +56,7 @@ services:
       # The email transport is selected by ENV/EMAIL_PROVIDER in
       # backend/.env; only the in-network Mailpit address is pinned here.
       MAILPIT_SMTP_ADDR: mailpit:1025
+      DOCKER_HOST: tcp://dind:2375
       MAILPIT_UI_URL: http://localhost:${MAILPIT_UI_PORT:-8025}
       # The backend image ships the utf CLI, so the gate invokes it directly
       # instead of going through dune the way the .env.example default does.
@@ -49,6 +67,8 @@ services:
       db:
         condition: service_healthy
       mailpit:
+        condition: service_healthy
+      dind:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8888/openapi.json"]
@@ -72,6 +92,7 @@ services:
       - node_modules:/app/node_modules
 
 volumes:
+  dind-data:
   pgdata:
   gomod:
   node_modules:

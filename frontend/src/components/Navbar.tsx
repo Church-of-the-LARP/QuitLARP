@@ -15,7 +15,7 @@ type NavbarProps = {
 export default function Navbar({ user, isAdmin, roleStyles, handleLogout }: NavbarProps) {
   return (
     <header className="border-b border-line bg-panel">
-      <div className="mx-auto flex w-[75vw] items-center justify-between py-3">
+      <div className="mx-auto flex w-[calc(100%-2rem)] sm:w-[75vw] flex-wrap items-center justify-between gap-y-2 py-3">
         <div className="flex items-center gap-4">
           <Link to="/" className="text-ink">
             <Logo className="h-6 w-auto" />
@@ -29,7 +29,7 @@ export default function Navbar({ user, isAdmin, roleStyles, handleLogout }: Navb
             </Link>
           )}
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <span className="hidden text-sm text-muted sm:inline">
             {user.username}
             <span className="mx-1.5 text-dim">·</span>
