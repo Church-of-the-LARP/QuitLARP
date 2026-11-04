@@ -9,7 +9,7 @@ export type AdminAssessment = {
   id: number;
   title: string;
   description: string;
-  difficulty: string;
+  difficulty: 'easy' | 'medium' | 'hard';
   timeLimitMinutes: number;
   author?: { username: string } | null;
 };

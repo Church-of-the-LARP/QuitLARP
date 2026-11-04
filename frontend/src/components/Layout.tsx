@@ -12,7 +12,8 @@ export default function Layout() {
 
   if (!user) return null;
 
-  const isAdmin = user.role === "admin";
+  const canAccessAdminPage =
+    user.role === "admin" || user.role === "moderator";
 
   const roleStyles: Record<Role, string> = {
     user: "bg-raised text-muted",
@@ -25,7 +26,7 @@ export default function Layout() {
       <div className="min-h-screen bg-glow">
         <Navbar
           user={user}
-          isAdmin={isAdmin}
+          canAccessAdminPage={canAccessAdminPage}
           roleStyles={roleStyles}
           handleLogout={handleLogout}
         />

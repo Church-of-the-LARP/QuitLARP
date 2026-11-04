@@ -7,12 +7,12 @@ type NavbarProps = {
     email: string;
     role: "user" | "moderator" | "admin";
   };
-  isAdmin: boolean;
+  canAccessAdminPage: boolean;
   roleStyles: Record<"user" | "moderator" | "admin", string>;
   handleLogout: () => void;
 }
 
-export default function Navbar({ user, isAdmin, roleStyles, handleLogout }: NavbarProps) {
+export default function Navbar({ user, canAccessAdminPage, roleStyles, handleLogout }: NavbarProps) {
   return (
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-[calc(100%-2rem)] sm:w-[75vw] flex-wrap items-center justify-between gap-y-2 py-3">
@@ -27,10 +27,10 @@ export default function Navbar({ user, isAdmin, roleStyles, handleLogout }: Navb
             <span className="mx-1.5 text-dim">·</span>
             {user.email}
           </span>
-          {isAdmin ? (
+          {canAccessAdminPage ? (
             <Link
               to="/admin"
-              aria-label="Open admin page"
+              aria-label={user.role === "admin" ? "Open admin page" : "Manage your assessments"}
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold hover:ring-1 hover:ring-current ${roleStyles[user.role]}`}
             >
               {user.role}

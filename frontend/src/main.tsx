@@ -50,7 +50,7 @@ createRoot(document.getElementById("root")!).render(
               <Route element={<SecuredRoute roles={["moderator", "admin"]} />}>
                 <Route path="/create" element={<Create />} />
               </Route>
-              <Route element={<SecuredRoute roles={["admin"]} />}>
+              <Route element={<SecuredRoute roles={["moderator", "admin"]} />}>
                 <Route path="/admin" element={<Admin />} />
               </Route>
             </Route>
