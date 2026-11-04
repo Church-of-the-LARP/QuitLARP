@@ -95,6 +95,7 @@ type AssessmentFilter struct {
 	Tag        string
 	Q          string
 	Author     string
+	AuthorID   *int64
 	Offset     int
 	Limit      int
 }
@@ -122,6 +123,10 @@ func assessmentWhere(f AssessmentFilter) (string, []any) {
 	if f.Author != "" {
 		args = append(args, "%"+f.Author+"%")
 		conds = append(conds, fmt.Sprintf("u.username ILIKE $%d", len(args)))
+	}
+	if f.AuthorID != nil {
+		args = append(args, *f.AuthorID)
+		conds = append(conds, fmt.Sprintf("a.author_id = $%d", len(args)))
 	}
 	if len(conds) == 0 {
 		return "", nil

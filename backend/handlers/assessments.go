@@ -139,6 +139,12 @@ type ListAssessmentsInput struct {
 	Limit      int    `query:"limit" example:"50" doc:"Maximum number of results (1-100, default 50)"`
 }
 
+// ListManageableAssessmentsInput is the request of GET /api/v1/manage/assessments.
+type ListManageableAssessmentsInput struct {
+	Offset int `query:"offset" example:"0" doc:"Number of results to skip"`
+	Limit  int `query:"limit" example:"50" doc:"Maximum number of results (1-100, default 50)"`
+}
+
 // CreateAssessmentInput is the request of POST /api/v1/assessments.
 type CreateAssessmentInput struct {
 	Body models.AssessmentDraft
@@ -217,6 +223,54 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		total, err := database.CountAssessments(ctx, h.db, filter)
 		if err != nil {
 			log.Printf("count assessments: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "could not list assessments")
+		}
+		resp := &AssessmentListOutput{}
+		resp.Body.Assessments = items
+		resp.Body.Total = total
+		return resp, nil
+	})
+
+	// GET /api/v1/manage/assessments — moderators see their own assessments;
+	// admins can manage all assessments.
+	huma.Register(api, huma.Operation{
+		OperationID: "listManageableAssessments",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/manage/assessments",
+		Summary:     "List assessments available to manage",
+		Description: "Requires moderator or admin role. Moderators see only assessments they authored; admins see all assessments.",
+	}, func(ctx context.Context, input *ListManageableAssessmentsInput) (*AssessmentListOutput, error) {
+		u, err := h.requireUser(ctx, models.RoleModerator, models.RoleAdmin)
+		if err != nil {
+			return nil, err
+		}
+		if input.Offset < 0 {
+			return nil, unprocessable("offset must be zero or greater")
+		}
+		limit := input.Limit
+		if limit == 0 {
+			limit = 50
+		}
+		if limit < 1 || limit > 100 {
+			return nil, unprocessable("limit must be between 1 and 100")
+		}
+
+		filter := database.AssessmentFilter{
+			Offset: input.Offset,
+			Limit:  limit,
+		}
+		if u.Role == models.RoleModerator {
+			filter.AuthorID = &u.ID
+		}
+
+		items, err := database.ListAssessments(ctx, h.db, filter)
+		if err != nil {
+			log.Printf("list manageable assessments: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "could not list assessments")
+		}
+		total, err := database.CountAssessments(ctx, h.db, filter)
+		if err != nil {
+			log.Printf("count manageable assessments: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not list assessments")
 		}
 		resp := &AssessmentListOutput{}

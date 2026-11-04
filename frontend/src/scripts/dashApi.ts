@@ -38,6 +38,19 @@ export async function getAssessments(
   return { assessments: data.assessments ?? [], total: data.total };
 }
 
+export async function getManageableAssessments(
+  offset = 0,
+  limit = 50,
+): Promise<ListAssessmentsOutput> {
+  const { data, error } = await client.GET("/api/v1/manage/assessments", {
+    params: { query: { offset, limit } },
+  });
+
+  if (error || !data) throw new DashApiError(getErrorText(error));
+
+  return { assessments: data.assessments ?? [], total: data.total };
+}
+
 export type ScheduledAssessment = components["schemas"]["ScheduledAssessment"];
 
 export async function getScheduled(limit?: number): Promise<ScheduledAssessment[]> {
