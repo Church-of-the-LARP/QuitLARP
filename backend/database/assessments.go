@@ -174,7 +174,6 @@ func ListAssessments(ctx context.Context, db *sqlx.DB, f AssessmentFilter) ([]mo
 func CountAssessments(ctx context.Context, db *sqlx.DB, f AssessmentFilter) (int64, error) {
 	where, args := assessmentWhere(f)
 	query := "SELECT COUNT(*) FROM assessments a LEFT JOIN users u ON u.id = a.author_id" + where
-	query := "SELECT COUNT(*) FROM assessments a LEFT JOIN users u ON u.id = a.author_id" + where
 	var total int64
 	if err := db.GetContext(ctx, &total, query, args...); err != nil {
 		return 0, err
