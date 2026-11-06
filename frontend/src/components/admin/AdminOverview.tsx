@@ -123,7 +123,6 @@ export default function AdminOverview({
                   <tr>
                     <th className="pb-2 pr-4 font-medium">Assessment</th>
                     <th className="pb-2 pr-4 font-medium">User</th>
-                    <th className="pb-2 pr-4 font-medium">Runtime</th>
                     <th className="pb-2 font-medium">Started</th>
                   </tr>
                 </thead>
@@ -135,9 +134,6 @@ export default function AdminOverview({
                       </td>
                       <td className="py-3 pr-4 text-muted">
                         User #{session.userId}
-                      </td>
-                      <td className="py-3 pr-4 text-muted">
-                        {session.runtime}
                       </td>
                       <td className="py-3 text-muted">
                         {formatDate(session.createdAt)}

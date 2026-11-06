@@ -90,7 +90,6 @@ func (r assessmentRow) assessment() models.Assessment {
 
 // AssessmentFilter narrows GET /assessments. Nil Difficulty and empty
 // Tag/Q/Author mean "no filter on that axis".
-// Tag/Q/Author mean "no filter on that axis".
 type AssessmentFilter struct {
 	Difficulty *models.Difficulty
 	Tag        string

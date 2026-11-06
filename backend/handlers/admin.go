@@ -24,7 +24,6 @@ type adminSession struct {
 	AssessmentTitle string `json:"assessmentTitle"`
 	Deadline        string `json:"deadline"`
 	CreatedAt       string `json:"createdAt"`
-	Runtime         string `json:"runtime"`
 }
 
 type AdminSessionInput struct {
@@ -67,7 +66,6 @@ func (h *Handlers) registerAdmin(api huma.API) {
 				AssessmentTitle: session.AssessmentTitle,
 				Deadline:        session.Deadline.UTC().Format("2006-01-02T15:04:05Z07:00"),
 				CreatedAt:       session.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
-				Runtime:         "runsc (gVisor)",
 			})
 		}
 		return out, nil

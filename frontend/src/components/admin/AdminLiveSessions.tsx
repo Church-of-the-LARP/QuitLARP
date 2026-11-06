@@ -19,7 +19,6 @@ export default function AdminLiveSessions({ sessions, busyId, onEnd }: Props) {
           <thead className="bg-panel text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-3">Assessment / user</th>
-              <th className="px-4 py-3">Runtime</th>
               <th className="px-4 py-3">Started</th>
               <th className="px-4 py-3">Deadline</th>
               <th className="px-4 py-3">Action</th>
@@ -34,8 +33,7 @@ export default function AdminLiveSessions({ sessions, busyId, onEnd }: Props) {
                     Assessment #{session.assessmentId} · User #{session.userId}
                   </div>
                 </td>
-                <td className="px-4 py-3">{session.runtime}</td>
-                <td className="px-4 py-3 text-muted">
+                  <td className="px-4 py-3 text-muted">
                   {date(session.createdAt)}
                 </td>
                 <td className="px-4 py-3 text-muted">

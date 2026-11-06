@@ -59,11 +59,6 @@ export default function AdminUsers() {
         return;
       }
 
-      if (target.id === user.id && role !== 'admin') {
-        window.location.assign('/dashboard');
-        return;
-      }
-
       await loadUsers();
     } catch (error) {
       setAlertMsg({
@@ -120,7 +115,12 @@ export default function AdminUsers() {
             <div className="relative shrink-0">
               <select
                 value={target.role}
-                disabled={loadingId === target.id}
+                disabled={loadingId === target.id || target.id === user.id}
+                title={
+                  target.id === user.id
+                    ? "You can't change your own role"
+                    : undefined
+                }
                 onChange={(event) => {
                   const role = event.target.value;
                   if (isRole(role)) void handleRoleChange(target, role);

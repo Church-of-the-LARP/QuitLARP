@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type SetStateAction } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import Alert from "../components/Alert.tsx";
 import useAuth from "../scripts/useAuth.tsx";
@@ -124,7 +124,7 @@ function App() {
           offset: offset,
           limit: PAGE_SIZE,
         })
-          .then((res: { assessments: SetStateAction<AssessmentSummary[]>; total: SetStateAction<number>; }) => {
+          .then((res) => {
             setPublicTests(res.assessments);
             setTestCount(res.total);
             setLoadError("");

@@ -21,7 +21,6 @@ export type AdminLiveSession = {
   assessmentTitle: string;
   deadline: string;
   createdAt: string;
-  runtime: string;
 };
 
 export type AdminSubmission = {
