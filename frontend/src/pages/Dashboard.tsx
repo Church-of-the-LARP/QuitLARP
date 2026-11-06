@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import Alert from "../components/Alert.tsx";
 import useAuth from "../scripts/useAuth.tsx";
 import type { ActionResult } from "../types/types.ts";
@@ -12,7 +13,6 @@ import {
   type Difficulty,
   type TagCount,
 } from "../scripts/dashApi.ts";
-import { Link } from "react-router-dom";
 
 const notifications = [
   {
@@ -152,10 +152,22 @@ function App() {
 
       <main className="mx-auto w-[calc(100%-2rem)] sm:w-[75vw] flex flex-col gap-5 py-6">
         <section className="mb-6">
-          <p className="mb-2 text-xs font-semibold uppercase text-accent-light">
-            Your progress
-          </p>
-          <h1 className="mb-6 text-3xl font-bold text-ink">User stats</h1>
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase text-accent-light">
+                Your progress
+              </p>
+              <h1 className="text-3xl font-bold text-ink">User stats</h1>
+            </div>
+            {(user.role === "moderator" || user.role === "admin") && (
+              <Link
+                to="/create"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell"
+              >
+                Create assessment
+              </Link>
+            )}
+          </div>
           <div className="flex flex-col sm:flex-row gap-5 w-full sm:h-60">
             <div className="flex h-full w-full flex-col justify-center rounded-xl bg-surface px-5 py-5 text-center">
               <p className="text-sm font-semibold uppercase text-muted">
@@ -185,7 +197,9 @@ function App() {
           <p className="mb-2 text-xs font-semibold uppercase text-accent-light">
             Keep learning
           </p>
-          <h1 className="mb-6 text-3xl font-bold text-ink">Upcoming tests</h1>
+          <h1 className="mb-6 text-3xl font-bold text-ink">
+            Upcoming tests
+          </h1>
           <div className="flex flex-nowrap overflow-auto justify-start items-center gap-5">
             {upcomingTests.length > 0 ? (
               upcomingTests.map((test, idx) => (
@@ -375,7 +389,9 @@ function App() {
             <p className="mb-2 text-xs font-semibold uppercase text-accent-light">
               Updates
             </p>
-            <h1 className="mb-6 text-3xl font-bold text-ink">Notifications</h1>
+            <h1 className="mb-6 text-3xl font-bold text-ink">
+              Notifications
+            </h1>
             <div className="flex flex-col gap-5">
               {notifications.map((notification, idx) => (
                 <div className="w-full rounded-xl bg-surface p-5" key={idx}>

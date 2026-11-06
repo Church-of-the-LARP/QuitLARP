@@ -34,9 +34,9 @@ func main() {
 	if err := database.Migrate(db); err != nil {
 		log.Fatalf("migrations: %v", err)
 	}
-	if err := database.SeedSuperadmin(context.Background(), db,
-		cfg.Superadmin.Username, cfg.Superadmin.Email, cfg.Superadmin.Password); err != nil {
-		log.Fatalf("seed superadmin: %v", err)
+	if err := database.SeedAdmin(context.Background(), db,
+		cfg.Admin.Username, cfg.Admin.Email, cfg.Admin.Password); err != nil {
+		log.Fatalf("seed admin: %v", err)
 	}
 
 	tokens := auth.New(cfg.JWTSecret, cfg.SessionTTL, cfg.ActionTokenTTL)

@@ -53,7 +53,7 @@ func (h *Handlers) registerAssessmentGit(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/assessments/{id}/repo/tree",
 		Summary:     "List a directory of an assessment repository",
-		Description: "The author of the assessment or an admin/superadmin may browse the repository that backs it; a repository with no commits yet returns an empty listing.",
+		Description: "The author of the assessment or an admin may browse the repository that backs it; a repository with no commits yet returns an empty listing.",
 	}, func(ctx context.Context, input *assessmentGitTreeInput) (*AssessmentGitTreeOutput, error) {
 		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err
@@ -91,7 +91,7 @@ func (h *Handlers) registerAssessmentGit(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/assessments/{id}/repo/file",
 		Summary:     "Read a file from an assessment repository",
-		Description: "The author of the assessment or an admin/superadmin may read a file in the repository that backs it; binary and oversized files return metadata only.",
+		Description: "The author of the assessment or an admin may read a file in the repository that backs it; binary and oversized files return metadata only.",
 	}, func(ctx context.Context, input *assessmentGitFileInput) (*AssessmentGitFileOutput, error) {
 		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err

@@ -84,7 +84,7 @@ func normalizeDraft(in models.AssessmentDraft) (models.AssessmentDraft, error) {
 }
 
 // requireManageableAssessment checks the caller is allowed to write to the
-// assessment: its author, or an admin/superadmin. The assessment must exist.
+// assessment: its author, or an admin. The assessment must exist.
 func (h *Handlers) requireManageableAssessment(ctx context.Context, id int64) error {
 	authorID, err := database.GetAssessmentAuthorID(ctx, h.db, id)
 	if err != nil {
@@ -98,8 +98,7 @@ func (h *Handlers) requireManageableAssessment(ctx context.Context, id int64) er
 	if err != nil {
 		return err
 	}
-	if (authorID != nil && *authorID == u.ID) ||
-		u.Role == models.RoleAdmin || u.Role == models.RoleSuperadmin {
+	if u.CanManageAssessment(authorID) {
 		return nil
 	}
 	return huma.NewError(http.StatusForbidden, "you do not have permission to do this")
@@ -138,6 +137,12 @@ type ListAssessmentsInput struct {
 	Author     string `query:"author" doc:"Search term matched against the author's username (case-insensitive)"`
 	Offset     int    `query:"offset" example:"0" doc:"Number of results to skip"`
 	Limit      int    `query:"limit" example:"50" doc:"Maximum number of results (1-100, default 50)"`
+}
+
+// ListManageableAssessmentsInput is the request of GET /api/v1/manage/assessments.
+type ListManageableAssessmentsInput struct {
+	Offset int `query:"offset" example:"0" doc:"Number of results to skip"`
+	Limit  int `query:"limit" example:"50" doc:"Maximum number of results (1-100, default 50)"`
 }
 
 // CreateAssessmentInput is the request of POST /api/v1/assessments.
@@ -226,15 +231,63 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		return resp, nil
 	})
 
+	// GET /api/v1/manage/assessments — moderators see their own assessments;
+	// admins can manage all assessments.
+	huma.Register(api, huma.Operation{
+		OperationID: "listManageableAssessments",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/manage/assessments",
+		Summary:     "List assessments available to manage",
+		Description: "Requires moderator or admin role. Moderators see only assessments they authored; admins see all assessments.",
+	}, func(ctx context.Context, input *ListManageableAssessmentsInput) (*AssessmentListOutput, error) {
+		u, err := h.requireUser(ctx, models.RoleModerator, models.RoleAdmin)
+		if err != nil {
+			return nil, err
+		}
+		if input.Offset < 0 {
+			return nil, unprocessable("offset must be zero or greater")
+		}
+		limit := input.Limit
+		if limit == 0 {
+			limit = 50
+		}
+		if limit < 1 || limit > 100 {
+			return nil, unprocessable("limit must be between 1 and 100")
+		}
+
+		filter := database.AssessmentFilter{
+			Offset: input.Offset,
+			Limit:  limit,
+		}
+		if u.Role == models.RoleModerator {
+			filter.AuthorID = &u.ID
+		}
+
+		items, err := database.ListAssessments(ctx, h.db, filter)
+		if err != nil {
+			log.Printf("list manageable assessments: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "could not list assessments")
+		}
+		total, err := database.CountAssessments(ctx, h.db, filter)
+		if err != nil {
+			log.Printf("count manageable assessments: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "could not list assessments")
+		}
+		resp := &AssessmentListOutput{}
+		resp.Body.Assessments = items
+		resp.Body.Total = total
+		return resp, nil
+	})
+
 	// POST /api/v1/assessments — any signed-in user authors assessments.
 	huma.Register(api, huma.Operation{
 		OperationID: "createAssessment",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/assessments",
 		Summary:     "Create an assessment",
-		Description: "Requires authentication. Chapters and hidden tests may be included; unknown tag names are created automatically.",
+		Description: "Requires the moderator or admin role. Chapters and hidden tests may be included; unknown tag names are created automatically.",
 	}, func(ctx context.Context, input *CreateAssessmentInput) (*AssessmentOutput, error) {
-		u, err := h.requireUser(ctx)
+		u, err := h.requireUser(ctx, models.RoleModerator, models.RoleAdmin)
 		if err != nil {
 			return nil, err
 		}
@@ -281,7 +334,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/assessments/{id}/repo",
 		Summary:     "Get the git repository of an assessment",
-		Description: "The author of the assessment or an admin/superadmin may read the repository that backs it; the link is where the assignment content gets pushed.",
+		Description: "The author of the assessment or an admin may read the repository that backs it; the link is where the assignment content gets pushed.",
 	}, func(ctx context.Context, input *struct {
 		ID int64 `path:"id" example:"1" doc:"Assessment id"`
 	}) (*AssessmentRepoOutput, error) {
@@ -301,7 +354,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Method:      http.MethodPatch,
 		Path:        "/api/v1/assessments/{id}",
 		Summary:     "Update an assessment",
-		Description: "The author of the assessment or an admin/superadmin may update its scalar fields and template. Chapters, tests and tags have their own endpoints.",
+		Description: "The author of the assessment or an admin may update its scalar fields and template. Chapters, tests and tags have their own endpoints.",
 	}, func(ctx context.Context, input *PatchAssessmentInput) (*AssessmentOutput, error) {
 		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err
@@ -359,7 +412,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/assessments/{id}",
 		Summary:     "Delete an assessment",
-		Description: "The author of the assessment or an admin/superadmin may delete it; its chapters, tests and tag links are removed with it.",
+		Description: "The author of the assessment or an admin may delete it; its chapters, tests and tag links are removed with it.",
 	}, func(ctx context.Context, input *struct {
 		ID int64 `path:"id" example:"1" doc:"Assessment id to delete"`
 	}) (*struct{}, error) {
@@ -379,7 +432,7 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		Method:      http.MethodPut,
 		Path:        "/api/v1/assessments/{id}/tags",
 		Summary:     "Replace the tags of an assessment",
-		Description: "The author of the assessment or an admin/superadmin may set its full tag list. Unknown tag names are created automatically.",
+		Description: "The author of the assessment or an admin may set its full tag list. Unknown tag names are created automatically.",
 	}, func(ctx context.Context, input *ReplaceAssessmentTagsInput) (*AssessmentOutput, error) {
 		if err := h.requireManageableAssessment(ctx, input.ID); err != nil {
 			return nil, err

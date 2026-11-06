@@ -108,9 +108,10 @@ export default function AssessmentPreview() {
   const activeTimeLimit = activeChapter
     ? activeChapter.timeLimitMinutes
     : assessment.timeLimitMinutes;
-  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
-  const isAuthor = user !== null && assessment.author?.id === user.id;
-  const showRepositoryLink = isAdmin || isAuthor;
+  const canManageAssessment =
+    user?.role === "admin" ||
+    (user?.role === "moderator" && assessment.author?.id === user.id);
+  const showRepositoryLink = canManageAssessment;
 
   return (
     <div className="flex flex-col items-center flex-1 py-20 px-4 sm:px-6 lg:px-8 w-screen">
@@ -229,7 +230,7 @@ export default function AssessmentPreview() {
           <p className="font-mono text-xs text-dim">
             {activeLabel} ({activeTimeLimit} min)
           </p>
-          <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-lg border border-line-hover bg-surface p-4 font-mono text-sm leading-relaxed text-muted">
+          <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-lg bg-surface p-4 font-mono text-sm leading-relaxed text-muted">
             {activeContent}
           </pre>
         </main>

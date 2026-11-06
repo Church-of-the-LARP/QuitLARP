@@ -9,6 +9,7 @@ import (
 	"github.com/pressly/goose/v3"
 
 	"backend/auth"
+	"backend/models"
 )
 
 //go:embed migrations/*.sql
@@ -24,23 +25,30 @@ func Migrate(db *sqlx.DB) error {
 	return nil
 }
 
-// SeedSuperadmin guarantees the single bootstrap super admin from the
-// configuration exists. It creates the account on first boot and afterwards
-// only repairs drift (wrong role, unverified email). The password is only
-// set on creation; later changes go through the normal reset flow.
-func SeedSuperadmin(ctx context.Context, db *sqlx.DB, username, email, password string) error {
+// SeedAdmin guarantees the configured bootstrap admin account exists. It
+// creates the account with the admin role on first boot and re-asserts that role
+// if it has drifted. Other users' roles are never touched; the password is only
+// set on creation.
+func SeedAdmin(ctx context.Context, db *sqlx.DB, username, email, password string) error {
 	existing, err := GetUserByUsername(ctx, db, username)
 	switch {
 	case err == nil:
-		// Account exists: keep role + email verification in sync with config.
-		if existing.Role != "superadmin" || !existing.EmailVerified || existing.Email != email {
+		// The bootstrap account must always be an admin so a bad role change
+		// is recoverable with a restart; also synchronize identity fields.
+		if existing.Role != models.RoleAdmin {
+			if err := SetUserRole(ctx, db, existing.ID, models.RoleAdmin); err != nil {
+				return err
+			}
+			log.Printf("bootstrap admin account %q role restored to admin", username)
+		}
+		if !existing.EmailVerified || existing.Email != email {
 			if _, err := db.ExecContext(ctx, `
 				UPDATE users
-				SET role = 'superadmin', email_verified = TRUE, email = $1, updated_at = NOW()
+				SET email_verified = TRUE, email = $1, updated_at = NOW()
 				WHERE id = $2`, email, existing.ID); err != nil {
 				return err
 			}
-			log.Printf("superadmin account %q repaired (role/email/verification synced from env)", username)
+			log.Printf("bootstrap admin account %q email/verification synced from env", username)
 		}
 		return nil
 	case err == ErrNotFound:
@@ -48,10 +56,10 @@ func SeedSuperadmin(ctx context.Context, db *sqlx.DB, username, email, password 
 		if err != nil {
 			return err
 		}
-		if _, err := CreateUser(ctx, db, username, email, &hash, "superadmin", true, nil); err != nil {
+		if _, err := CreateUser(ctx, db, username, email, &hash, "admin", true, nil); err != nil {
 			return err
 		}
-		log.Printf("created superadmin account %q from environment config", username)
+		log.Printf("created bootstrap admin account %q from environment config", username)
 		return nil
 	default:
 		return err

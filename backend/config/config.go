@@ -17,7 +17,7 @@ import (
 
 const (
 	defaultJWTSecret     = "dev-only-insecure-jwt-secret-change-me"
-	defaultSuperPassword = "superadmin-dev-password-change-me"
+	defaultAdminPassword = "admin-dev-password-change-me"
 
 	// EmailProviderMailpit captures mail on a local Mailpit server (dev).
 	EmailProviderMailpit = "mailpit"
@@ -46,7 +46,7 @@ type Config struct {
 	Email          EmailConfig
 	GitReposDir    string // where the local git server keeps its bare repositories
 	Google         GoogleConfig
-	Superadmin     SuperadminConfig
+	Admin          AdminConfig
 	Validation     ValidationConfig
 	AssessmentEnv  AssessmentEnvConfig
 }
@@ -132,8 +132,8 @@ type EmailConfig struct {
 	ResendAPIKey string
 }
 
-// SuperadminConfig describes the single bootstrap super admin for the app.
-type SuperadminConfig struct {
+// AdminConfig describes the bootstrap admin account.
+type AdminConfig struct {
 	Username string
 	Email    string
 	Password string
@@ -213,16 +213,24 @@ func Load() (*Config, error) {
 		RedirectURL:  get("GOOGLE_REDIRECT_URL", cfg.PublicBaseURL+"/api/v1/auth/google/callback"),
 	}
 
-	cfg.Superadmin = SuperadminConfig{
-		Username: strings.TrimSpace(get("SUPERADMIN_USERNAME", "superadmin")),
-		Email:    strings.TrimSpace(get("SUPERADMIN_EMAIL", "superadmin@example.com")),
-		Password: get("SUPERADMIN_PASSWORD", defaultSuperPassword),
+	cfg.Admin = AdminConfig{
+		// Read legacy names as a fallback so existing deployments keep their configured account.
+		Username: strings.TrimSpace(getWithLegacy("ADMIN_USERNAME", "SUPERADMIN_USERNAME", "admin")),
+		Email:    strings.TrimSpace(getWithLegacy("ADMIN_EMAIL", "SUPERADMIN_EMAIL", "admin@example.com")),
+		Password: getWithLegacy("ADMIN_PASSWORD", "SUPERADMIN_PASSWORD", defaultAdminPassword),
 	}
-	if cfg.Superadmin.Password == defaultSuperPassword {
-		log.Printf("WARNING: SUPERADMIN_PASSWORD not set in the environment; using an insecure development default. Set it in backend/.env before deploying.")
+	if cfg.Admin.Password == defaultAdminPassword {
+		log.Printf("WARNING: ADMIN_PASSWORD not set in the environment; using an insecure development default. Set it in backend/.env before deploying.")
 	}
 
 	return cfg, nil
+}
+
+func getWithLegacy(key, legacyKey, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value
+	}
+	return get(legacyKey, fallback)
 }
 
 // emailProvider resolves EMAIL_PROVIDER, falling back to the environment:
