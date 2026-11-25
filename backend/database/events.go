@@ -26,6 +26,9 @@ type eventRow struct {
 	HostID       *int64             `db:"host_id"`
 	HostUsername *string            `db:"host_username"`
 	Status       models.EventStatus `db:"status"`
+	Solo         bool               `db:"solo"`
+	Monitored    bool               `db:"monitored"`
+	AllowInvites bool               `db:"allow_invites"`
 	JoinCode     string             `db:"join_code"`
 	StartsAt     *time.Time         `db:"starts_at"`
 	EndsAt       *time.Time         `db:"ends_at"`
@@ -35,7 +38,7 @@ type eventRow struct {
 
 const eventColumns = `
 	e.id, e.title, e.description, e.host_id, u.username AS host_username,
-	e.status::text, e.join_code, e.starts_at, e.ends_at,
+	e.status::text, e.solo, e.monitored, e.allow_invites, e.join_code, e.starts_at, e.ends_at,
 	e.created_at, e.updated_at`
 
 func (r eventRow) host() *models.AuthorRef {
@@ -93,6 +96,65 @@ func ListUserEvents(ctx context.Context, db *sqlx.DB, userID int64) ([]models.Ev
 		HostID       *int64             `db:"host_id"`
 		HostUsername *string            `db:"host_username"`
 		Status       models.EventStatus `db:"status"`
+		Solo         bool               `db:"solo"`
+		Monitored    bool               `db:"monitored"`
+		AllowInvites bool               `db:"allow_invites"`
+		JoinCode     string             `db:"join_code"`
+		StartsAt     *time.Time         `db:"starts_at"`
+		EndsAt       *time.Time         `db:"ends_at"`
+		CreatedAt    time.Time          `db:"created_at"`
+		UpdatedAt    time.Time          `db:"updated_at"`
+		TaskCount    int64              `db:"task_count"`
+	}{}
+	err := db.SelectContext(ctx, &rows, `
+		SELECT `+eventColumns+`,
+		       (SELECT COUNT(*) FROM event_tasks t WHERE t.event_id = e.id) AS task_count
+		FROM events e
+		LEFT JOIN users u ON u.id = e.host_id
+		JOIN event_members m ON m.event_id = e.id
+		WHERE m.user_id = $1 AND NOT e.solo
+		ORDER BY e.id DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]models.EventSummary, 0, len(rows))
+	for _, row := range rows {
+		var host *models.AuthorRef
+		if row.HostID != nil && row.HostUsername != nil {
+			host = &models.AuthorRef{ID: *row.HostID, Username: *row.HostUsername}
+		}
+		out = append(out, models.EventSummary{
+			ID:           row.ID,
+			Title:        row.Title,
+			Description:  row.Description,
+			Status:       row.Status,
+			Host:         host,
+			Solo:         row.Solo,
+			Monitored:    row.Monitored,
+			AllowInvites: row.AllowInvites,
+			StartsAt:     row.StartsAt,
+			EndsAt:       row.EndsAt,
+			TaskCount:    row.TaskCount,
+			CreatedAt:    row.CreatedAt,
+		})
+	}
+	return out, nil
+}
+
+// ListUpcomingEvents returns the live, non-solo events the user belongs to
+// whose deadline has not passed, soonest start first. It feeds the dashboard's
+// upcoming-tests list.
+func ListUpcomingEvents(ctx context.Context, db *sqlx.DB, userID int64) ([]models.EventSummary, error) {
+	rows := []struct {
+		ID           int64              `db:"id"`
+		Title        string             `db:"title"`
+		Description  string             `db:"description"`
+		HostID       *int64             `db:"host_id"`
+		HostUsername *string            `db:"host_username"`
+		Status       models.EventStatus `db:"status"`
+		Solo         bool               `db:"solo"`
+		Monitored    bool               `db:"monitored"`
+		AllowInvites bool               `db:"allow_invites"`
 		JoinCode     string             `db:"join_code"`
 		StartsAt     *time.Time         `db:"starts_at"`
 		EndsAt       *time.Time         `db:"ends_at"`
@@ -107,7 +169,11 @@ func ListUserEvents(ctx context.Context, db *sqlx.DB, userID int64) ([]models.Ev
 		LEFT JOIN users u ON u.id = e.host_id
 		JOIN event_members m ON m.event_id = e.id
 		WHERE m.user_id = $1
-		ORDER BY e.id DESC`, userID)
+		  AND NOT e.solo
+		  AND e.monitored
+		  AND e.status = 'live'
+		  AND (e.ends_at IS NULL OR e.ends_at > NOW())
+		ORDER BY COALESCE(e.starts_at, e.created_at) ASC, e.id ASC`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,32 +184,37 @@ func ListUserEvents(ctx context.Context, db *sqlx.DB, userID int64) ([]models.Ev
 			host = &models.AuthorRef{ID: *row.HostID, Username: *row.HostUsername}
 		}
 		out = append(out, models.EventSummary{
-			ID:          row.ID,
-			Title:       row.Title,
-			Description: row.Description,
-			Status:      row.Status,
-			Host:        host,
-			StartsAt:    row.StartsAt,
-			EndsAt:      row.EndsAt,
-			TaskCount:   row.TaskCount,
-			CreatedAt:   row.CreatedAt,
+			ID:           row.ID,
+			Title:        row.Title,
+			Description:  row.Description,
+			Status:       row.Status,
+			Host:         host,
+			Solo:         row.Solo,
+			Monitored:    row.Monitored,
+			AllowInvites: row.AllowInvites,
+			StartsAt:     row.StartsAt,
+			EndsAt:       row.EndsAt,
+			TaskCount:    row.TaskCount,
+			CreatedAt:    row.CreatedAt,
 		})
 	}
 	return out, nil
 }
 
-// CreateEvent inserts an event, its host membership, its unbound tasks and
-// their positions in a single transaction. Task ids must refer to unbound
-// assessments. Returns the new event id.
-func CreateEvent(ctx context.Context, db *sqlx.DB, hostID int64, draft models.EventDraft) (int64, error) {
+// CreateEvent inserts an event, its host membership, its tasks and their
+// positions in a single transaction. Tasks may be any assessment; unbound
+// tasks get collaborative workspaces, leetcode tasks are opened as normal
+// assessments by participants. Returns the new event id.
+func CreateEvent(ctx context.Context, db *sqlx.DB, hostID int64, monitored bool, draft models.EventDraft) (int64, error) {
 	taskIDs := dedupeIDs(draft.TaskIDs)
 	for _, taskID := range taskIDs {
-		var kind string
-		if err := db.GetContext(ctx, &kind, "SELECT kind FROM assessments WHERE id = $1", taskID); err != nil {
-			return 0, fmt.Errorf("task %d: %w", taskID, mapNotFound(err))
+		var exists bool
+		if err := db.GetContext(ctx, &exists,
+			"SELECT EXISTS (SELECT 1 FROM assessments WHERE id = $1)", taskID); err != nil {
+			return 0, fmt.Errorf("task %d: %w", taskID, err)
 		}
-		if kind != models.KindUnbound {
-			return 0, fmt.Errorf("task %d is not an unbound task", taskID)
+		if !exists {
+			return 0, fmt.Errorf("task %d: %w", taskID, ErrNotFound)
 		}
 	}
 
@@ -163,10 +234,10 @@ func CreateEvent(ctx context.Context, db *sqlx.DB, hostID int64, draft models.Ev
 			return 0, err
 		}
 		err = tx.GetContext(ctx, &id, `
-			INSERT INTO events (title, description, host_id, status, join_code, starts_at, ends_at)
-			VALUES ($1, $2, $3, 'draft', $4, $5, $6)
+			INSERT INTO events (title, description, host_id, status, join_code, starts_at, ends_at, monitored, allow_invites)
+			VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, $8)
 			RETURNING id`,
-			draft.Title, draft.Description, hostID, code, draft.StartsAt, draft.EndsAt)
+			draft.Title, draft.Description, hostID, code, draft.StartsAt, draft.EndsAt, monitored, draft.AllowInvites)
 		if err == nil {
 			if _, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT join_code"); err != nil {
 				return 0, err
@@ -188,6 +259,28 @@ func CreateEvent(ctx context.Context, db *sqlx.DB, hostID int64, draft models.Ev
 		INSERT INTO event_members (event_id, user_id, role)
 		VALUES ($1, $2, 'host')`, id, hostID); err != nil {
 		return 0, err
+	}
+
+	for _, raw := range draft.MemberUsernames {
+		username := strings.TrimSpace(raw)
+		if username == "" {
+			continue
+		}
+		var memberID int64
+		err := tx.GetContext(ctx, &memberID,
+			"SELECT id FROM users WHERE LOWER(username) = LOWER($1)", username)
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("user %q: %w", username, ErrNotFound)
+		}
+		if err != nil {
+			return 0, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO event_members (event_id, user_id, role)
+			VALUES ($1, $2, 'member')
+			ON CONFLICT (event_id, user_id) DO NOTHING`, id, memberID); err != nil {
+			return 0, err
+		}
 	}
 
 	for i, taskID := range taskIDs {
@@ -479,12 +572,13 @@ func ListEventTasks(ctx context.Context, db *sqlx.DB, eventID, viewerID int64, i
 		ID           int64  `db:"id"`
 		EventID      int64  `db:"event_id"`
 		AssessmentID int64  `db:"assessment_id"`
+		Kind         string `db:"kind"`
 		Position     int    `db:"position"`
 		Title        string `db:"title"`
 		Description  string `db:"description"`
 	}{}
 	err := db.SelectContext(ctx, &rows, `
-		SELECT t.id, t.event_id, t.assessment_id, t.position, a.title, a.description
+		SELECT t.id, t.event_id, t.assessment_id, a.kind, t.position, a.title, a.description
 		FROM event_tasks t JOIN assessments a ON a.id = t.assessment_id
 		WHERE t.event_id = $1
 		ORDER BY t.position, t.id`, eventID)
@@ -501,6 +595,7 @@ func ListEventTasks(ctx context.Context, db *sqlx.DB, eventID, viewerID int64, i
 			ID:           row.ID,
 			EventID:      row.EventID,
 			AssessmentID: row.AssessmentID,
+			Kind:         row.Kind,
 			Position:     row.Position,
 			Title:        row.Title,
 			Description:  row.Description,
@@ -508,6 +603,21 @@ func ListEventTasks(ctx context.Context, db *sqlx.DB, eventID, viewerID int64, i
 		})
 	}
 	return out, nil
+}
+
+// FirstAttemptForTask returns the existing workspace for an event task. It is
+// used by unmonitored collaborations, where every member shares one project
+// instead of creating a private attempt.
+func FirstAttemptForTask(ctx context.Context, db *sqlx.DB, eventID, taskID int64) (AttemptRow, error) {
+	var row AttemptRow
+	err := db.GetContext(ctx, &row, `SELECT `+attemptColumns+attemptJoins+`
+		WHERE att.event_id = $1 AND att.event_task_id = $2
+		ORDER BY att.id ASC
+		LIMIT 1`, eventID, taskID)
+	if err != nil {
+		return AttemptRow{}, mapNotFound(err)
+	}
+	return row, nil
 }
 
 // CreateAttempt creates one attempt for an event task, its owner membership
@@ -594,6 +704,126 @@ func CreateAttempt(ctx context.Context, db *sqlx.DB, eventID, taskID, ownerID in
 	return GetAttempt(ctx, db, id)
 }
 
+// GetOrCreateSoloWorkspace returns the caller's private practice attempt for an
+// unbound assessment. It creates a hidden, live event with one task and one
+// solo attempt on first use, so unbound tasks can be practised without hosting
+// a collaborative event.
+func GetOrCreateSoloWorkspace(ctx context.Context, db *sqlx.DB, user models.User, assessmentID int64) (AttemptRow, error) {
+	var attemptID int64
+	err := db.GetContext(ctx, &attemptID, `
+		SELECT att.id
+		FROM event_attempts att
+		JOIN events e ON e.id = att.event_id
+		JOIN event_tasks t ON t.id = att.event_task_id
+		WHERE e.solo AND e.host_id = $1 AND e.status = 'live'
+		  AND t.assessment_id = $2 AND att.owner_id = $1
+		ORDER BY att.id DESC LIMIT 1`, user.ID, assessmentID)
+	switch {
+	case err == nil:
+		return GetAttempt(ctx, db, attemptID)
+	case !errors.Is(err, sql.ErrNoRows):
+		return AttemptRow{}, err
+	}
+
+	var assessmentTitle string
+	if err := db.GetContext(ctx, &assessmentTitle,
+		"SELECT title FROM assessments WHERE id = $1", assessmentID); err != nil {
+		return AttemptRow{}, mapNotFound(err)
+	}
+
+	eventID, taskID, err := findSoloEvent(ctx, db, user.ID, assessmentID)
+	if err != nil {
+		return AttemptRow{}, err
+	}
+	if eventID == 0 {
+		eventID, taskID, err = createSoloEvent(ctx, db, user.ID, assessmentID, assessmentTitle)
+		if err != nil {
+			return AttemptRow{}, err
+		}
+	}
+	return CreateAttempt(ctx, db, eventID, taskID, user.ID, models.AttemptSolo, user.Username)
+}
+
+// findSoloEvent returns the caller's live solo event for an assessment and its
+// event task, or zero ids when none exists yet.
+func findSoloEvent(ctx context.Context, db *sqlx.DB, userID, assessmentID int64) (int64, int64, error) {
+	var row struct {
+		EventID int64 `db:"event_id"`
+		TaskID  int64 `db:"task_id"`
+	}
+	err := db.GetContext(ctx, &row, `
+		SELECT e.id AS event_id, t.id AS task_id
+		FROM events e
+		JOIN event_tasks t ON t.event_id = e.id
+		WHERE e.solo AND e.host_id = $1 AND e.status = 'live'
+		  AND t.assessment_id = $2
+		ORDER BY e.id DESC LIMIT 1`, userID, assessmentID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, nil
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+	return row.EventID, row.TaskID, nil
+}
+
+// createSoloEvent inserts a hidden live event, its host membership and one
+// unbound task in a single transaction.
+func createSoloEvent(ctx context.Context, db *sqlx.DB, hostID, assessmentID int64, title string) (int64, int64, error) {
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+
+	var eventID int64
+	for range 5 {
+		code, err := randomCode(10)
+		if err != nil {
+			return 0, 0, err
+		}
+		if _, err := tx.ExecContext(ctx, "SAVEPOINT solo_join_code"); err != nil {
+			return 0, 0, err
+		}
+		err = tx.GetContext(ctx, &eventID, `
+			INSERT INTO events (title, description, host_id, status, join_code, solo, starts_at)
+			VALUES ($1, 'Private solo practice workspace.', $2, 'live', $3, TRUE, NOW())
+			RETURNING id`, title, hostID, code)
+		if err == nil {
+			if _, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT solo_join_code"); err != nil {
+				return 0, 0, err
+			}
+			break
+		}
+		if !IsUniqueViolation(err) {
+			return 0, 0, err
+		}
+		if _, rollbackErr := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT solo_join_code"); rollbackErr != nil {
+			return 0, 0, rollbackErr
+		}
+	}
+	if eventID == 0 {
+		return 0, 0, errors.New("could not allocate a unique join code")
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO event_members (event_id, user_id, role)
+		VALUES ($1, $2, 'host')`, eventID, hostID); err != nil {
+		return 0, 0, err
+	}
+	var taskID int64
+	if err := tx.GetContext(ctx, &taskID, `
+		INSERT INTO event_tasks (event_id, assessment_id, position)
+		VALUES ($1, $2, 1)
+		RETURNING id`, eventID, assessmentID); err != nil {
+		return 0, 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, 0, err
+	}
+	return eventID, taskID, nil
+}
+
 // AddAttemptMember adds a user to an attempt.
 func AddAttemptMember(ctx context.Context, db *sqlx.DB, attemptID, userID int64) error {
 	_, err := db.ExecContext(ctx, `
@@ -654,18 +884,21 @@ func GetEventDetail(ctx context.Context, db *sqlx.DB, id int64, baseURL string, 
 		return models.Event{}, err
 	}
 	out := models.Event{
-		ID:          row.ID,
-		Title:       row.Title,
-		Description: row.Description,
-		Status:      row.Status,
-		Host:        row.host(),
-		IsHost:      isHost,
-		StartsAt:    row.StartsAt,
-		EndsAt:      row.EndsAt,
-		Tasks:       tasks,
-		Members:     members,
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
+		ID:           row.ID,
+		Title:        row.Title,
+		Description:  row.Description,
+		Status:       row.Status,
+		Host:         row.host(),
+		IsHost:       isHost,
+		Solo:         row.Solo,
+		Monitored:    row.Monitored,
+		AllowInvites: row.AllowInvites,
+		StartsAt:     row.StartsAt,
+		EndsAt:       row.EndsAt,
+		Tasks:        tasks,
+		Members:      members,
+		CreatedAt:    row.CreatedAt,
+		UpdatedAt:    row.UpdatedAt,
 	}
 	if includeJoinCode {
 		out.JoinCode = row.JoinCode
@@ -675,10 +908,11 @@ func GetEventDetail(ctx context.Context, db *sqlx.DB, id int64, baseURL string, 
 
 // EventPatch carries the optional scalar updates of PATCH /events/{id}.
 type EventPatch struct {
-	Title       *string
-	Description *string
-	StartsAt    **time.Time
-	EndsAt      **time.Time
+	Title        *string
+	Description  *string
+	StartsAt     **time.Time
+	EndsAt       **time.Time
+	AllowInvites *bool
 }
 
 // UpdateEvent applies the provided fields.
@@ -700,6 +934,9 @@ func UpdateEvent(ctx context.Context, db *sqlx.DB, id int64, patch EventPatch) e
 	}
 	if patch.EndsAt != nil {
 		add("ends_at", *patch.EndsAt)
+	}
+	if patch.AllowInvites != nil {
+		add("allow_invites", *patch.AllowInvites)
 	}
 	if len(sets) == 0 {
 		return nil

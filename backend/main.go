@@ -38,6 +38,13 @@ func main() {
 		cfg.Admin.Username, cfg.Admin.Email, cfg.Admin.Password); err != nil {
 		log.Fatalf("seed admin: %v", err)
 	}
+	admin, err := database.GetUserByUsername(context.Background(), db, cfg.Admin.Username)
+	if err != nil {
+		log.Fatalf("seed admin lookup: %v", err)
+	}
+	if err := database.SeedAssessments(context.Background(), db, cfg.GitReposDir, admin.ID); err != nil {
+		log.Fatalf("seed assessments: %v", err)
+	}
 
 	tokens := auth.New(cfg.JWTSecret, cfg.SessionTTL, cfg.ActionTokenTTL)
 	google := auth.NewGoogleClient(cfg.Google.ClientID, cfg.Google.ClientSecret, cfg.Google.RedirectURL)

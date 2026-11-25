@@ -135,6 +135,15 @@ type AssessmentRepoOutput struct {
 	}
 }
 
+// SoloWorkspaceOutput is the response of POST
+// /api/v1/assessments/{id}/solo-workspace.
+type SoloWorkspaceOutput struct {
+	Body struct {
+		EventID   int64 `json:"eventId" doc:"Hidden event that owns the workspace"`
+		AttemptID int64 `json:"attemptId" doc:"The caller's solo attempt"`
+	}
+}
+
 // AssessmentListOutput is the response of GET /api/v1/assessments.
 type AssessmentListOutput struct {
 	Body struct {
@@ -469,6 +478,44 @@ func (h *Handlers) registerAssessments(api huma.API) {
 		}
 		resp := &AssessmentOutput{}
 		resp.Body.Assessment = got
+		return resp, nil
+	})
+
+	// POST /api/v1/assessments/{id}/solo-workspace — any signed-in user.
+	huma.Register(api, huma.Operation{
+		OperationID: "startSoloWorkspace",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/assessments/{id}/solo-workspace",
+		Summary:     "Start a solo workspace for an unbound task",
+		Description: "Requires authentication. Returns a private workspace backed by a hidden event and one solo attempt, creating them on first use. Only unbound assessments can be started alone.",
+	}, func(ctx context.Context, input *assessmentIDInput) (*SoloWorkspaceOutput, error) {
+		u, err := h.requireUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+		kind, err := database.GetAssessmentKind(ctx, h.db, input.ID)
+		if err != nil {
+			if errors.Is(err, database.ErrNotFound) {
+				return nil, huma.NewError(http.StatusNotFound, "assessment not found")
+			}
+			log.Printf("solo workspace kind lookup: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "something went wrong")
+		}
+		if kind != models.KindUnbound {
+			return nil, unprocessable("only unbound assessments can be started alone")
+		}
+		attempt, err := database.GetOrCreateSoloWorkspace(ctx, h.db, u, input.ID)
+		if err != nil {
+			log.Printf("solo workspace: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "could not create the workspace")
+		}
+		if err := h.ensureAttemptWorkspace(ctx, u, attempt); err != nil {
+			log.Printf("solo workspace seed %d: %v", attempt.ID, err)
+			return nil, huma.NewError(http.StatusBadGateway, "could not prepare the workspace: "+err.Error())
+		}
+		resp := &SoloWorkspaceOutput{}
+		resp.Body.EventID = attempt.EventID
+		resp.Body.AttemptID = attempt.ID
 		return resp, nil
 	})
 }

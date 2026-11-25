@@ -95,7 +95,8 @@ type EventAttempt struct {
 type EventTask struct {
 	ID           int64          `json:"id" doc:"Event task id"`
 	EventID      int64          `json:"eventId" doc:"The event this task belongs to"`
-	AssessmentID int64          `json:"assessmentId" doc:"The unbound task definition"`
+	AssessmentID int64          `json:"assessmentId" doc:"The assessment attached to the event"`
+	Kind         string         `json:"kind" doc:"Assessment kind: leetcode or unbound"`
 	Position     int            `json:"position" doc:"1-based ordering hint"`
 	Title        string         `json:"title" doc:"Task title"`
 	Description  string         `json:"description" doc:"Task description"`
@@ -104,41 +105,50 @@ type EventTask struct {
 
 // EventSummary is one row of GET /api/v1/events.
 type EventSummary struct {
-	ID          int64       `json:"id" doc:"Event id"`
-	Title       string      `json:"title" doc:"Event title"`
-	Description string      `json:"description" doc:"Event description"`
-	Status      EventStatus `json:"status" enum:"draft,live,ended" doc:"Lifecycle state"`
-	Host        *AuthorRef  `json:"host" doc:"User running the event"`
-	StartsAt    *time.Time  `json:"startsAt,omitempty" doc:"Planned start"`
-	EndsAt      *time.Time  `json:"endsAt,omitempty" doc:"Planned end"`
-	TaskCount   int64       `json:"taskCount" doc:"Number of unbound tasks attached"`
-	CreatedAt   time.Time   `json:"createdAt" doc:"Creation time"`
+	ID           int64       `json:"id" doc:"Event id"`
+	Title        string      `json:"title" doc:"Event title"`
+	Description  string      `json:"description" doc:"Event description"`
+	Status       EventStatus `json:"status" enum:"draft,live,ended" doc:"Lifecycle state"`
+	Host         *AuthorRef  `json:"host" doc:"User running the event"`
+	Solo         bool        `json:"solo" doc:"Whether this is a private solo practice workspace"`
+	Monitored    bool        `json:"monitored" doc:"Whether HR monitors this event and its results"`
+	AllowInvites bool        `json:"allowInvites" doc:"Whether participants may invite collaborators into their attempt"`
+	StartsAt     *time.Time  `json:"startsAt,omitempty" doc:"Planned start"`
+	EndsAt       *time.Time  `json:"endsAt,omitempty" doc:"Planned end"`
+	TaskCount    int64       `json:"taskCount" doc:"Number of unbound tasks attached"`
+	CreatedAt    time.Time   `json:"createdAt" doc:"Creation time"`
 }
 
 // Event is the full representation returned by GET /api/v1/events/{id}.
 type Event struct {
-	ID          int64         `json:"id" doc:"Event id"`
-	Title       string        `json:"title" doc:"Event title"`
-	Description string        `json:"description" doc:"Event description"`
-	Status      EventStatus   `json:"status" enum:"draft,live,ended" doc:"Lifecycle state"`
-	Host        *AuthorRef    `json:"host" doc:"User running the event"`
-	IsHost      bool          `json:"isHost" doc:"Whether the caller hosts this event"`
-	JoinCode    string        `json:"joinCode,omitempty" doc:"Code members use to join; only returned to the host"`
-	StartsAt    *time.Time    `json:"startsAt,omitempty" doc:"Planned start"`
-	EndsAt      *time.Time    `json:"endsAt,omitempty" doc:"Planned end"`
-	Tasks       []EventTask   `json:"tasks" doc:"Unbound tasks of this event"`
-	Members     []EventMember `json:"members" doc:"Participants, host first"`
-	CreatedAt   time.Time     `json:"createdAt" doc:"Creation time"`
-	UpdatedAt   time.Time     `json:"updatedAt" doc:"Last modification time"`
+	ID           int64         `json:"id" doc:"Event id"`
+	Title        string        `json:"title" doc:"Event title"`
+	Description  string        `json:"description" doc:"Event description"`
+	Status       EventStatus   `json:"status" enum:"draft,live,ended" doc:"Lifecycle state"`
+	Host         *AuthorRef    `json:"host" doc:"User running the event"`
+	IsHost       bool          `json:"isHost" doc:"Whether the caller hosts this event"`
+	Solo         bool          `json:"solo" doc:"Whether this is a private solo practice workspace"`
+	Monitored    bool          `json:"monitored" doc:"Whether HR monitors this event and its results"`
+	AllowInvites bool          `json:"allowInvites" doc:"Whether participants may invite collaborators into their attempt"`
+	JoinCode     string        `json:"joinCode,omitempty" doc:"Code members use to join; only returned to the host"`
+	StartsAt     *time.Time    `json:"startsAt,omitempty" doc:"Planned start"`
+	EndsAt       *time.Time    `json:"endsAt,omitempty" doc:"Planned end"`
+	Tasks        []EventTask   `json:"tasks" doc:"Unbound tasks of this event"`
+	Members      []EventMember `json:"members" doc:"Participants, host first"`
+	CreatedAt    time.Time     `json:"createdAt" doc:"Creation time"`
+	UpdatedAt    time.Time     `json:"updatedAt" doc:"Last modification time"`
 }
 
 // EventDraft is the payload of POST /api/v1/events.
 type EventDraft struct {
-	Title       string     `json:"title" doc:"Event title"`
-	Description string     `json:"description" doc:"Event description"`
-	TaskIDs     []int64    `json:"taskIds,omitempty" doc:"Ids of unbound tasks to attach"`
-	StartsAt    *time.Time `json:"startsAt,omitempty" doc:"Planned start"`
-	EndsAt      *time.Time `json:"endsAt,omitempty" doc:"Planned end"`
+	Title           string     `json:"title" doc:"Event title"`
+	Description     string     `json:"description" doc:"Event description"`
+	TaskIDs         []int64    `json:"taskIds,omitempty" doc:"Ids of assessments to attach"`
+	MemberUsernames []string   `json:"memberUsernames,omitempty" doc:"Users assigned to the event up front"`
+	Monitored       bool       `json:"monitored,omitempty" doc:"HR interview session; requires the moderator or admin role"`
+	AllowInvites    bool       `json:"allowInvites,omitempty" doc:"Let candidates invite collaborators into their attempt"`
+	StartsAt        *time.Time `json:"startsAt,omitempty" doc:"Planned start"`
+	EndsAt          *time.Time `json:"endsAt,omitempty" doc:"Planned end"`
 }
 
 // AttemptDraft is the payload of POST /events/{id}/tasks/{taskId}/attempts.

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -45,6 +46,13 @@ type EventOutput struct {
 type AttemptOutput struct {
 	Body struct {
 		Attempt models.EventAttempt `json:"attempt"`
+	}
+}
+
+// EventResultsOutput is the response of GET /api/v1/events/{id}/results.
+type EventResultsOutput struct {
+	Body struct {
+		Results models.EventResults `json:"results"`
 	}
 }
 
@@ -170,10 +178,11 @@ type RemoveAttemptMemberInput struct {
 type PatchEventInput struct {
 	ID   int64 `path:"id" example:"1" doc:"Event id"`
 	Body struct {
-		Title       *string    `json:"title,omitempty" doc:"Event title"`
-		Description *string    `json:"description,omitempty" doc:"Event description"`
-		StartsAt    *time.Time `json:"startsAt,omitempty" doc:"Planned start"`
-		EndsAt      *time.Time `json:"endsAt,omitempty" doc:"Planned end"`
+		Title        *string    `json:"title,omitempty" doc:"Event title"`
+		Description  *string    `json:"description,omitempty" doc:"Event description"`
+		StartsAt     *time.Time `json:"startsAt,omitempty" doc:"Planned start"`
+		EndsAt       *time.Time `json:"endsAt,omitempty" doc:"Planned end"`
+		AllowInvites *bool      `json:"allowInvites,omitempty" doc:"Let candidates invite collaborators into their attempt"`
 	}
 }
 
@@ -211,8 +220,8 @@ func (h *Handlers) registerEvents(api huma.API) {
 		OperationID: "listEvents",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/events",
-		Summary:     "List my events",
-		Description: "Requires authentication. Returns the events the caller hosts or has joined, newest first.",
+		Summary:     "List my collaborations",
+		Description: "Requires authentication. Returns the events the caller hosts or has joined, newest first. Creating events remains restricted to moderators and admins.",
 	}, func(ctx context.Context, _ *struct{}) (*EventListOutput, error) {
 		u, err := h.requireUser(ctx)
 		if err != nil {
@@ -229,11 +238,32 @@ func (h *Handlers) registerEvents(api huma.API) {
 	})
 
 	huma.Register(api, huma.Operation{
+		OperationID: "listUpcomingEvents",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/upcoming-events",
+		Summary:     "List upcoming events",
+		Description: "Requires authentication. Returns the live events the caller is assigned to whose deadline has not passed, for the dashboard's upcoming-tests list.",
+	}, func(ctx context.Context, _ *struct{}) (*EventListOutput, error) {
+		u, err := h.requireUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+		list, err := database.ListUpcomingEvents(ctx, h.db, u.ID)
+		if err != nil {
+			log.Printf("list upcoming events: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "could not list upcoming events")
+		}
+		resp := &EventListOutput{}
+		resp.Body.Events = list
+		return resp, nil
+	})
+
+	huma.Register(api, huma.Operation{
 		OperationID: "createEvent",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/events",
 		Summary:     "Create an event",
-		Description: "Requires authentication. The creator hosts the event; attached tasks must be unbound tasks. A join code is generated for participants.",
+		Description: "Requires authentication. Moderators and admins host monitored interview sessions; regular users host unmonitored collaborations. Tasks may be any assessment and memberUsernames assigns participants up front.",
 	}, func(ctx context.Context, input *CreateEventInput) (*EventOutput, error) {
 		u, err := h.requireUser(ctx)
 		if err != nil {
@@ -248,10 +278,17 @@ func (h *Handlers) registerEvents(api huma.API) {
 		if draft.StartsAt != nil && draft.EndsAt != nil && draft.EndsAt.Before(*draft.StartsAt) {
 			return nil, unprocessable("endsAt must not be before startsAt")
 		}
-		id, err := database.CreateEvent(ctx, h.db, u.ID, draft)
+		monitored := draft.Monitored
+		if monitored && u.Role != models.RoleModerator && u.Role != models.RoleAdmin {
+			return nil, huma.NewError(http.StatusForbidden, "only moderators and admins can host monitored interviews")
+		}
+		if !monitored || (u.Role != models.RoleModerator && u.Role != models.RoleAdmin) {
+			draft.AllowInvites = false
+		}
+		id, err := database.CreateEvent(ctx, h.db, u.ID, monitored, draft)
 		if err != nil {
 			if errors.Is(err, database.ErrNotFound) {
-				return nil, unprocessable("one of the tasks does not exist")
+				return nil, unprocessable("one of the tasks or users does not exist")
 			}
 			log.Printf("create event: %v", err)
 			return nil, unprocessable(err.Error())
@@ -271,6 +308,100 @@ func (h *Handlers) registerEvents(api huma.API) {
 			return nil, err
 		}
 		return h.eventOutput(ctx, input.ID, u)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "getEventResults",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/events/{id}/results",
+		Summary:     "Get event results",
+		Description: "The host sees every unbound attempt with its workspace/deployment, and each participant's latest solution and test run for coding tasks.",
+	}, func(ctx context.Context, input *EventIDInput) (*EventResultsOutput, error) {
+		u, err := h.requireEventHost(ctx, input.ID)
+		if err != nil {
+			return nil, err
+		}
+		row, err := database.GetEventRow(ctx, h.db, input.ID)
+		if err != nil {
+			return nil, h.eventError(err)
+		}
+		if !row.Monitored {
+			return nil, huma.NewError(http.StatusForbidden, "results are only available for HR-hosted interviews")
+		}
+		tasks, err := database.ListEventTasks(ctx, h.db, input.ID, u.ID, true, h.cfg.PublicBaseURL)
+		if err != nil {
+			return nil, h.eventError(err)
+		}
+		members, err := database.ListEventMembers(ctx, h.db, input.ID)
+		if err != nil {
+			return nil, h.eventError(err)
+		}
+		results := models.EventResults{Tasks: make([]models.EventTaskResults, 0, len(tasks))}
+		for _, task := range tasks {
+			taskResults := models.EventTaskResults{
+				ID:           task.ID,
+				AssessmentID: task.AssessmentID,
+				Kind:         task.Kind,
+				Title:        task.Title,
+				Attempts:     task.Attempts,
+				Participants: []models.EventResultParticipant{},
+			}
+			if task.Kind != models.KindUnbound {
+				for _, member := range members {
+					participant := models.EventResultParticipant{
+						UserID:   member.UserID,
+						Username: member.Username,
+					}
+					solution, err := database.GetSolution(ctx, h.db, task.AssessmentID, member.UserID)
+					switch {
+					case err == nil:
+						ref := &models.SolutionRef{
+							CommitSHA: solution.CommitSHA,
+							CreatedAt: solution.CreatedAt,
+							UpdatedAt: solution.UpdatedAt,
+							Files:     []models.SolutionFile{},
+						}
+						dir := filepath.Join(h.cfg.GitReposDir,
+							filepath.FromSlash(models.SolutionRepoID(task.AssessmentID, member.UserID)+".git"))
+						files, fileErr := repos.SnapshotFiles(dir)
+						if fileErr != nil {
+							log.Printf("event results: read solution of user %d: %v", member.UserID, fileErr)
+						}
+						for path, data := range files {
+							if len(data) > maxEventFileBytes || repos.IsBinary(data) {
+								continue
+							}
+							ref.Files = append(ref.Files, models.SolutionFile{
+								Path:    path,
+								Content: string(data),
+							})
+						}
+						sort.Slice(ref.Files, func(i, j int) bool {
+							return ref.Files[i].Path < ref.Files[j].Path
+						})
+						participant.Solution = ref
+					case !errors.Is(err, database.ErrNotFound):
+						log.Printf("event results: solution of user %d: %v", member.UserID, err)
+					}
+					run, err := database.LatestTestRun(ctx, h.db, task.AssessmentID, member.UserID)
+					switch {
+					case err == nil:
+						participant.TestRun = &run
+					case !errors.Is(err, database.ErrNotFound):
+						log.Printf("event results: test run of user %d: %v", member.UserID, err)
+					}
+					if member.Role == models.EventRoleHost &&
+						participant.Solution == nil && participant.TestRun == nil {
+						continue
+					}
+					taskResults.Participants = append(taskResults.Participants, participant)
+				}
+			}
+			results.Tasks = append(results.Tasks, taskResults)
+		}
+		resp := &EventResultsOutput{}
+		resp.Body.Results = results
+		return resp, nil
 	})
 
 	huma.Register(api, huma.Operation{
@@ -303,6 +434,9 @@ func (h *Handlers) registerEvents(api huma.API) {
 		if input.Body.EndsAt != nil {
 			v := input.Body.EndsAt
 			patch.EndsAt = &v
+		}
+		if input.Body.AllowInvites != nil {
+			patch.AllowInvites = input.Body.AllowInvites
 		}
 		if err := database.UpdateEvent(ctx, h.db, input.ID, patch); err != nil {
 			return nil, h.eventError(err)
@@ -465,8 +599,8 @@ func (h *Handlers) registerEvents(api huma.API) {
 		OperationID: "createEventAttempt",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/events/{id}/tasks/{taskId}/attempts",
-		Summary:     "Create a solo or team attempt",
-		Description: "A live event member creates their own attempt, or the host creates one for another user. The attempt gets its own repo and deployment, seeded from the task definition.",
+		Summary:     "Create or join a workspace",
+		Description: "A live event member joins the shared collaboration workspace, or creates their own attempt in an HR interview. Collaborations reuse one workspace per task; interviews give every candidate a private attempt.",
 	}, func(ctx context.Context, input *CreateAttemptInput) (*AttemptOutput, error) {
 		u, _, isHost, err := h.requireEventUser(ctx, input.ID)
 		if err != nil {
@@ -478,6 +612,18 @@ func (h *Handlers) registerEvents(api huma.API) {
 		}
 		if row.Status != models.EventStatusLive {
 			return nil, huma.NewError(http.StatusConflict, "the event must be live to create an attempt")
+		}
+		if !row.Monitored {
+			shared, err := database.FirstAttemptForTask(ctx, h.db, input.ID, input.TaskID)
+			switch {
+			case err == nil:
+				if err := database.AddAttemptMember(ctx, h.db, shared.ID, u.ID); err != nil {
+					return nil, h.eventError(err)
+				}
+				return h.attemptOutput(ctx, input.ID, shared.ID, u, isHost)
+			case !errors.Is(err, database.ErrNotFound):
+				return nil, h.eventError(err)
+			}
 		}
 		kind := input.Body.Kind
 		if kind == "" {
@@ -744,8 +890,19 @@ func (h *Handlers) registerEvents(api huma.API) {
 		if err != nil {
 			return nil, err
 		}
-		if !access.canManageMembers() {
-			return nil, huma.NewError(http.StatusForbidden, "only the attempt owner or host can add members")
+		row, err := database.GetEventRow(ctx, h.db, input.ID)
+		if err != nil {
+			return nil, h.eventError(err)
+		}
+		allowed := access.isHost
+		if !allowed && access.myRole == models.AttemptRoleOwner {
+			allowed = !row.Monitored || row.AllowInvites
+		}
+		if !allowed {
+			return nil, huma.NewError(http.StatusForbidden, "inviting collaborators is disabled for this session")
+		}
+		if row.Status != models.EventStatusLive {
+			return nil, huma.NewError(http.StatusConflict, "the session must be live to invite collaborators")
 		}
 		member, err := database.GetUserByUsername(ctx, h.db, strings.TrimSpace(input.Body.Username))
 		if err != nil {
@@ -817,6 +974,9 @@ func (h *Handlers) loadAttemptAccess(ctx context.Context, eventID, attemptID int
 	if err != nil {
 		return attemptAccess{}, h.eventError(err)
 	}
+	if eventRole == "" && u.Role != models.RoleAdmin {
+		return attemptAccess{}, huma.NewError(http.StatusForbidden, "you are not a member of this event")
+	}
 	isHost := eventRole == models.EventRoleHost || u.Role == models.RoleAdmin
 	myRole, err := database.GetAttemptMemberRole(ctx, h.db, attemptID, u.ID)
 	if err != nil {
@@ -874,6 +1034,10 @@ func (h *Handlers) EventStream(w http.ResponseWriter, r *http.Request) {
 	eventRole, err := database.GetEventMemberRole(r.Context(), h.db, eventID, u.ID)
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "could not authorize the stream")
+		return
+	}
+	if eventRole == "" && u.Role != models.RoleAdmin {
+		writeProblem(w, http.StatusForbidden, "you are not a member of this event")
 		return
 	}
 	isHost := eventRole == models.EventRoleHost || u.Role == models.RoleAdmin
@@ -945,6 +1109,9 @@ func (h *Handlers) eventOutput(ctx context.Context, id int64, u models.User) (*E
 		for ai := range event.Tasks[ti].Attempts {
 			event.Tasks[ti].Attempts[ai].Dirty = h.collab.Dirty(event.Tasks[ti].Attempts[ai].ID)
 		}
+	}
+	if !isHost {
+		event.Members = []models.EventMember{}
 	}
 	resp := &EventOutput{}
 	resp.Body.Event = event

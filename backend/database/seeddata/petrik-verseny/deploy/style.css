@@ -1,0 +1,23 @@
+/* Az egész oldal betűtípusa */
+body {
+    font-family: 'Trebuchet MS', sans-serif;
+}
+
+/* Nyitó rész háttérképe */
+.hos {
+    background-image: url("https://images.pexels.com/photos/39510436/pexels-photo-39510436.jpeg");
+    background-size: cover;
+    background-position: center;
+    text-shadow: 2px 2px 4px black;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* A kártyák képeinek egységes mérete */
+.card-img-top {
+    height: 200px;
+    object-fit: cover;
+}

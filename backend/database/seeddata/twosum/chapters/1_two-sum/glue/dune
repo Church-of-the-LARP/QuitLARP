@@ -1,0 +1,6 @@
+(test
+ (name two_sum)
+ (libraries utf_bridge)
+ (deps two_sum_functions.py two_sum_server.py)
+ (preprocess
+  (pps utf_ppx)))

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import client, { getErrorText } from "../scripts/api";
+import { startSoloWorkspace } from "../scripts/eventsApi";
 import useAuth from "../scripts/useAuth.tsx";
 import type { components } from "../api/schema.ts";
 import usePageTitle from "../scripts/usePageTitle.ts";
@@ -25,11 +26,14 @@ export default function AssessmentPreview() {
   const params = useParams();
   const id = Number(params.id);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [soloBusy, setSoloBusy] = useState(false);
+  const [soloError, setSoloError] = useState("");
 
   usePageTitle(assessment ? `Preview: ${assessment.title}` : undefined);
 
@@ -114,10 +118,25 @@ export default function AssessmentPreview() {
   const showRepositoryLink = canManageAssessment;
   const isUnbound = assessment.kind === "unbound";
 
+  const handleStartSolo = async () => {
+    setSoloError("");
+    setSoloBusy(true);
+    try {
+      const workspace = await startSoloWorkspace(id);
+      navigate(`/collaborations/${workspace.eventId}`);
+    } catch (err) {
+      setSoloError(
+        err instanceof Error ? err.message : "Could not start the workspace",
+      );
+    } finally {
+      setSoloBusy(false);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center flex-1 py-20 px-4 sm:px-6 lg:px-8 w-screen">
       <div className="flex w-full max-w-4xl flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-        <div className="flex flex-col">
+        <div className="flex min-w-0 flex-col">
           <div className="flex flex-wrap">
             <h1 className="text-2xl font-bold text-ink">
               {assessment.title} : &nbsp;
@@ -129,29 +148,39 @@ export default function AssessmentPreview() {
             </h1>
           </div>
         </div>
-        <div className="flex flex-col sm:items-end gap-2">
-          <div className="flex flex-row flex-wrap items-center gap-3 sm:gap-4">
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="flex flex-col items-end gap-3 sm:flex-row sm:flex-nowrap sm:items-center sm:gap-4">
             {isUnbound ? (
-              <Link
-                to="/events"
-                className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg"
-              >
-                host an event with this task
-              </Link>
+              <>
+                <button
+                  onClick={() => void handleStartSolo()}
+                  disabled={soloBusy}
+                  className="bg-accent hover:bg-accent-light text-shell text-sm font-semibold whitespace-nowrap px-6 py-3 rounded-lg disabled:opacity-60"
+                >
+                  {soloBusy ? "starting..." : "start alone"}
+                </button>
+                <Link
+                  to={`/collaborations?task=${id}`}
+                  className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold whitespace-nowrap px-6 py-3 rounded-lg"
+                >
+                  host a collaboration with this task
+                </Link>
+              </>
             ) : (
               <>
-                <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
+                <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold whitespace-nowrap px-6 py-3 rounded-lg">
                   leaderboard &amp; solutions
                 </button>
                 <Link
                   to={`/assessments/${id}/solve`}
-                  className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg"
+                  className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold whitespace-nowrap px-6 py-3 rounded-lg"
                 >
                   begin practice run
                 </Link>
               </>
             )}
           </div>
+          {soloError && <p className="text-sm text-danger">{soloError}</p>}
           {showRepositoryLink && (
             <Link
               to={`/assessments/${id}/git`}
