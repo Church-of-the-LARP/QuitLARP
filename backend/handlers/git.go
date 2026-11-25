@@ -351,6 +351,13 @@ func (h *Handlers) authorizeAttemptRepo(ctx context.Context, u models.User, atte
 	if u.Role == models.RoleAdmin {
 		return nil
 	}
+	eventRole, err := database.GetEventMemberRole(ctx, h.db, attempt.EventID, u.ID)
+	if err != nil {
+		return fmt.Errorf("event membership lookup: %w", err)
+	}
+	if eventRole == "" {
+		return errAssessmentRepoForbidden
+	}
 	role, err := database.GetAttemptMemberRole(ctx, h.db, attempt.ID, u.ID)
 	if err != nil {
 		return fmt.Errorf("attempt membership lookup: %w", err)
@@ -362,10 +369,6 @@ func (h *Handlers) authorizeAttemptRepo(ctx context.Context, u models.User, atte
 		return nil
 	}
 
-	eventRole, err := database.GetEventMemberRole(ctx, h.db, attempt.EventID, u.ID)
-	if err != nil {
-		return fmt.Errorf("event membership lookup: %w", err)
-	}
 	if eventRole == models.EventRoleHost {
 		if service == gitReceivePack {
 			return errAssessmentRepoForbidden

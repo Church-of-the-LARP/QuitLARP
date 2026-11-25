@@ -158,7 +158,8 @@ export default function Create() {
                   whole directory is served as the deployment.
                 </li>
                 <li>
-                  Add this task to an event to collaborate and deploy it at{" "}
+                  Add this task to an interview or collaboration to work on and
+                  deploy it at{" "}
                   <code className="font-mono text-ink">/deploy/&lt;id&gt;/</code>.
                 </li>
               </>
@@ -179,10 +180,10 @@ export default function Create() {
 
           {kind === "unbound" && (
             <Link
-              to="/events"
+              to={`/interviews?task=${repo.id}`}
               className="self-start text-sm font-semibold text-accent-light transition hover:text-accent-lighter"
             >
-              Host an event with this task
+              Host an interview with this task
             </Link>
           )}
 
