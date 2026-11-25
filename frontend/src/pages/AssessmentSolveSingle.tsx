@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
+import { Check, X } from "lucide-react";
 import Markdown from "react-markdown";
 import { Link, useParams } from "react-router-dom";
 import usePageTitle from "../scripts/usePageTitle.ts";
@@ -465,13 +466,20 @@ export default function AssessmentSolveSingle() {
           </h1>
           <div className="flex flex-row flex-wrap items-center gap-3">
             <label className="flex cursor-pointer items-center gap-2 text-xs text-muted transition hover:text-accent-lighter has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
-              <input
-                type="checkbox"
-                checked={isPublic}
-                onChange={(event) => setIsPublic(event.target.checked)}
-                disabled={controlsDisabled}
-                className="h-4 w-4 shrink-0 cursor-[inherit] appearance-none rounded border border-line-hover bg-surface bg-center bg-no-repeat outline-none transition checked:border-accent checked:bg-accent checked:bg-[url('data:image/svg+xml;utf8,<svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2016%2016%22%20fill=%22none%22%20stroke=%22%2309090b%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22><path%20d=%22M3.5%208.5l3%203%206-6.5%22/></svg>')] focus-visible:ring-2 focus-visible:ring-accent/30"
-              />
+              <span className="relative flex size-4 shrink-0 items-center justify-center">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(event) => setIsPublic(event.target.checked)}
+                  disabled={controlsDisabled}
+                  className="peer h-4 w-4 shrink-0 cursor-[inherit] appearance-none rounded border border-line-hover bg-surface outline-none transition checked:border-accent checked:bg-accent focus-visible:ring-2 focus-visible:ring-accent/30"
+                />
+                <Check
+                  aria-hidden="true"
+                  strokeWidth={3}
+                  className="pointer-events-none absolute inset-0 m-auto h-3 w-3 text-shell opacity-0 transition peer-checked:opacity-100"
+                />
+              </span>
               make my solution public
             </label>
             <button
@@ -590,7 +598,11 @@ export default function AssessmentSolveSingle() {
                               result.passed ? "text-success" : "text-danger"
                             }
                           >
-                            {result.passed ? "✓" : "✗"}
+                            {result.passed ? (
+                              <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                            ) : (
+                              <X aria-hidden="true" className="h-3.5 w-3.5" />
+                            )}
                           </span>
                           {result.name}
                         </span>

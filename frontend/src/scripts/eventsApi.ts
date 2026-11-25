@@ -46,6 +46,7 @@ export type EventTask = {
   id: number;
   eventId: number;
   assessmentId: number;
+  kind: "leetcode" | "unbound";
   position: number;
   title: string;
   description: string;
@@ -65,6 +66,9 @@ export type EventSummary = {
   description: string;
   status: EventStatus;
   host?: { id: number; username: string };
+  solo: boolean;
+  monitored: boolean;
+  allowInvites: boolean;
   startsAt?: string;
   endsAt?: string;
   taskCount: number;
@@ -76,6 +80,41 @@ export type EventDetail = EventSummary & {
   joinCode?: string;
   tasks: EventTask[];
   members: EventMember[];
+};
+
+export type TestCheck = {
+  name: string;
+  passed: boolean;
+  detail: string;
+};
+
+export type AssessmentTestRun = {
+  id: number;
+  assessmentId: number;
+  results: TestCheck[];
+  allPassed: boolean;
+  createdAt: string;
+};
+
+export type EventResultParticipant = {
+  userId: number;
+  username: string;
+  solution: {
+    commitSha: string;
+    createdAt: string;
+    updatedAt: string;
+    files: { path: string; content: string }[];
+  } | null;
+  testRun: AssessmentTestRun | null;
+};
+
+export type EventTaskResults = {
+  id: number;
+  assessmentId: number;
+  kind: "leetcode" | "unbound";
+  title: string;
+  attempts: EventAttempt[];
+  participants: EventResultParticipant[];
 };
 
 export type UnboundTask = {
@@ -172,6 +211,9 @@ export async function createEvent(input: {
   title: string;
   description: string;
   taskIds: number[];
+  memberUsernames?: string[];
+  monitored?: boolean;
+  allowInvites?: boolean;
   startsAt?: string;
   endsAt?: string;
 }): Promise<EventDetail> {
@@ -187,9 +229,26 @@ export async function getEvent(id: number): Promise<EventDetail> {
   return data.event;
 }
 
+// startSoloWorkspace creates (or reuses) the caller's private workspace for an
+// unbound assessment and returns the hidden event that backs it.
+export async function startSoloWorkspace(
+  assessmentId: number,
+): Promise<{ eventId: number; attemptId: number }> {
+  return request<{ eventId: number; attemptId: number }>(
+    `/api/v1/assessments/${assessmentId}/solo-workspace`,
+    { method: "POST" },
+  );
+}
+
 export async function patchEvent(
   id: number,
-  input: { title?: string; description?: string; startsAt?: string; endsAt?: string },
+  input: {
+    title?: string;
+    description?: string;
+    startsAt?: string;
+    endsAt?: string;
+    allowInvites?: boolean;
+  },
 ): Promise<EventDetail> {
   const data = await request<{ event: EventDetail }>(`/api/v1/events/${id}`, {
     method: "PATCH",
@@ -252,11 +311,36 @@ export async function removeEventMember(
   return data.event;
 }
 
-export async function listUnboundTasks(): Promise<UnboundTask[]> {
+export async function listHostableTasks(): Promise<UnboundTask[]> {
   const data = await request<{ assessments: UnboundTask[] }>(
-    "/api/v1/assessments?kind=unbound&limit=100",
+    "/api/v1/assessments?limit=100",
   );
   return data.assessments ?? [];
+}
+
+export async function listUpcomingEvents(): Promise<EventSummary[]> {
+  const data = await request<{ events: EventSummary[] }>(
+    "/api/v1/upcoming-events",
+  );
+  return data.events ?? [];
+}
+
+export async function getEventResults(
+  id: number,
+): Promise<{ tasks: EventTaskResults[] }> {
+  const data = await request<{ results: { tasks: EventTaskResults[] } }>(
+    `/api/v1/events/${id}/results`,
+  );
+  return data.results;
+}
+
+export async function searchUsers(
+  q: string,
+): Promise<{ id: number; username: string }[]> {
+  const data = await request<{ users: { id: number; username: string }[] }>(
+    `/api/v1/users/search?q=${encodeURIComponent(q)}`,
+  );
+  return data.users ?? [];
 }
 
 export async function createAttempt(

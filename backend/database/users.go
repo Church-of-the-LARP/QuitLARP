@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 
@@ -70,6 +71,18 @@ func ListUsers(ctx context.Context, db *sqlx.DB) ([]models.User, error) {
 	users := []models.User{}
 	err := db.SelectContext(ctx, &users,
 		"SELECT "+models.UserColumns+" FROM users ORDER BY id")
+	return users, err
+}
+
+// SearchUsernames returns up to limit accounts whose username starts with q,
+// used by the host forms' autocomplete. Matching is case-insensitive.
+func SearchUsernames(ctx context.Context, db *sqlx.DB, q string, limit int) ([]models.AuthorRef, error) {
+	users := []models.AuthorRef{}
+	err := db.SelectContext(ctx, &users, `
+		SELECT id, username FROM users
+		WHERE username ILIKE $1 || '%'
+		ORDER BY LENGTH(username), LOWER(username)
+		LIMIT $2`, strings.TrimSpace(q), limit)
 	return users, err
 }
 

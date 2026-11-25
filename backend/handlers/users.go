@@ -19,6 +19,13 @@ type UsersOutput struct {
 	}
 }
 
+// UserSearchOutput is the response of GET /api/v1/users/search.
+type UserSearchOutput struct {
+	Body struct {
+		Users []models.AuthorRef `json:"users"`
+	}
+}
+
 // UpdateUserRoleInput is the request of PATCH /api/v1/users/{id}/role.
 type UpdateUserRoleInput struct {
 	ID   int64 `path:"id" example:"1" doc:"User id to change"`
@@ -28,6 +35,34 @@ type UpdateUserRoleInput struct {
 }
 
 func (h *Handlers) registerUsers(api huma.API) {
+	// GET /api/v1/users/search?q=... — hosts adding people by username.
+	huma.Register(api, huma.Operation{
+		OperationID: "searchUsers",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/users/search",
+		Summary:     "Search usernames",
+		Description: "Requires the moderator or admin role. Returns up to 8 usernames starting with q (at least 3 characters).",
+	}, func(ctx context.Context, input *struct {
+		Q string `query:"q" minLength:"3" maxLength:"32" doc:"Username prefix (at least 3 characters)"`
+	}) (*UserSearchOutput, error) {
+		if _, err := h.requireUser(ctx, models.RoleModerator, models.RoleAdmin); err != nil {
+			return nil, err
+		}
+		resp := &UserSearchOutput{}
+		q := strings.TrimSpace(input.Q)
+		if len(q) < 3 {
+			resp.Body.Users = []models.AuthorRef{}
+			return resp, nil
+		}
+		users, err := database.SearchUsernames(ctx, h.db, q, 8)
+		if err != nil {
+			log.Printf("search users: %v", err)
+			return nil, huma.NewError(http.StatusInternalServerError, "could not search users")
+		}
+		resp.Body.Users = users
+		return resp, nil
+	})
+
 	// GET /api/v1/users — admins only.
 	huma.Register(api, huma.Operation{
 		OperationID: "listUsers",

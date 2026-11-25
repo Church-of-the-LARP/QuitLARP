@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
 import Alert from '../Alert.tsx';
 import useAuth from '../../scripts/useAuth.tsx';
 import client, { getErrorText } from '../../scripts/api.ts';
@@ -106,8 +107,15 @@ export default function AdminUsers() {
               </p>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
                 <span className="truncate">{target.email}</span>
-                <span>
-                  {target.emailVerified ? '✓ verified' : 'unverified'}
+                <span className="inline-flex items-center gap-1">
+                  {target.emailVerified ? (
+                    <>
+                      <Check aria-hidden="true" className="h-3 w-3" />
+                      verified
+                    </>
+                  ) : (
+                    'unverified'
+                  )}
                 </span>
                 {target.googleLinked && <span>Google account</span>}
               </p>
@@ -134,20 +142,10 @@ export default function AdminUsers() {
                   </option>
                 ))}
               </select>
-              <svg
+              <ChevronDown
                 aria-hidden="true"
-                viewBox="0 0 16 16"
-                fill="none"
                 className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted"
-              >
-                <path
-                  d="m4 6 4 4 4-4"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.5"
-                />
-              </svg>
+              />
             </div>
           </li>
         ))}

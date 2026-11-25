@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Check, X } from "lucide-react";
 import type { ReactNode } from "react";
 import usePageTitle from "../scripts/usePageTitle.ts";
 
@@ -77,7 +78,11 @@ function TestResultsMock() {
             <span
               className={row.pass ? "text-accent-light" : "text-red-400/90"}
             >
-              {row.pass ? "✓" : "✗"}
+              {row.pass ? (
+                <Check aria-hidden="true" className="h-3.5 w-3.5" />
+              ) : (
+                <X aria-hidden="true" className="h-3.5 w-3.5" />
+              )}
             </span>
             <span className={row.pass ? "text-muted" : "text-red-400/90"}>
               {row.label}
@@ -119,7 +124,15 @@ function ChapterListMock() {
                     : "size-4 rounded-full border border-line-hover"
                 }
               >
-                {chapter.done ? "✓" : ""}
+                {chapter.done ? (
+                  <Check
+                    aria-hidden="true"
+                    strokeWidth={3}
+                    className="h-2.5 w-2.5"
+                  />
+                ) : (
+                  ""
+                )}
               </span>
               <span className="text-sm text-ink">{chapter.title}</span>
             </div>

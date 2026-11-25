@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { useForm } from '@tanstack/react-form';
 import { z } from 'zod';
 import Alert from '../components/Alert.tsx';
@@ -98,9 +99,10 @@ function App() {
           </form.Subscribe>
           <Link
             to="/login"
-            className="block w-full text-center text-sm text-muted hover:text-ink"
+            className="flex w-full items-center justify-center gap-1.5 text-center text-sm text-muted hover:text-ink"
           >
-            ← Back to sign in
+            <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
+            Back to sign in
           </Link>
         </form>
       </div>
