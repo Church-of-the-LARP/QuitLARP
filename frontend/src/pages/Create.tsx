@@ -17,6 +17,11 @@ type RepoState = {
 export default function Create() {
   usePageTitle('Create assessment');
   const [title, setTitle] = useState('');
+  const [kind, setKind] = useState<'leetcode' | 'unbound'>(() =>
+    new URLSearchParams(window.location.search).get('kind') === 'unbound'
+      ? 'unbound'
+      : 'leetcode',
+  );
   const [titleError, setTitleError] = useState<string | null>(null);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -61,10 +66,17 @@ export default function Create() {
       const res = await client.POST('/api/v1/assessments', {
         body: {
           title: name,
-          description: 'Maintained from the assessment repository.',
+          kind,
+          description:
+            kind === 'unbound'
+              ? 'An unbound web-app task. Push an app with a deploy/ directory; every push to main deploys.'
+              : 'Maintained from the assessment repository.',
           difficulty: 'easy',
           timeLimitMinutes: 120,
-          template: { fileName: 'main.py', content: '' },
+          template:
+            kind === 'unbound'
+              ? { fileName: 'deploy/index.html', content: '' }
+              : { fileName: 'main.py', content: '' },
         },
       });
 
@@ -138,10 +150,24 @@ export default function Create() {
           <ul className="flex flex-col gap-1 text-sm text-muted">
             <li>Push the assessment content to the main branch of this repository.</li>
             <li>The README.md at the repository root becomes the assessment description.</li>
-            <li>
-              Each <code className="font-mono text-ink">chapters/&lt;index&gt;_&lt;name&gt;/</code>{' '}
-              directory becomes a chapter.
-            </li>
+            {kind === "unbound" ? (
+              <>
+                <li>
+                  The app lives in{" "}
+                  <code className="font-mono text-ink">deploy/index.html</code>; the
+                  whole directory is served as the deployment.
+                </li>
+                <li>
+                  Add this task to an event to collaborate and deploy it at{" "}
+                  <code className="font-mono text-ink">/deploy/&lt;id&gt;/</code>.
+                </li>
+              </>
+            ) : (
+              <li>
+                Each <code className="font-mono text-ink">chapters/&lt;index&gt;_&lt;name&gt;/</code>{" "}
+                directory becomes a chapter.
+              </li>
+            )}
           </ul>
 
           <Link
@@ -150,6 +176,15 @@ export default function Create() {
           >
             Browse the repository
           </Link>
+
+          {kind === "unbound" && (
+            <Link
+              to="/events"
+              className="self-start text-sm font-semibold text-accent-light transition hover:text-accent-lighter"
+            >
+              Host an event with this task
+            </Link>
+          )}
 
           <Link
             to={`/assessments/${repo.id}/preview`}
@@ -169,6 +204,31 @@ export default function Create() {
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div className="rounded-xl border border-line-hover bg-surface p-6 flex flex-col gap-4">
+            <div>
+              <p className="mb-2 block font-semibold text-muted">Task type</p>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["leetcode", "LeetCode task", "Hidden UFT checks run in a sandbox."],
+                    ["unbound", "Unbound web app", "No hidden checks; deploy/ becomes a live site."],
+                  ] as const
+                ).map(([value, label, detail]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setKind(value)}
+                    className={`rounded-xl border px-4 py-2 text-left text-sm transition ${
+                      kind === value
+                        ? "border-accent bg-accent/10 text-ink"
+                        : "border-line-hover bg-panel text-muted hover:text-ink"
+                    }`}
+                  >
+                    <span className="block font-semibold">{label}</span>
+                    <span className="block text-xs text-muted">{detail}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div>
               <label className="mb-1 block font-semibold text-muted" htmlFor="assessment-name">
                 Assessment name
@@ -196,8 +256,9 @@ export default function Create() {
             </div>
 
             <p className="text-sm text-muted">
-              The description and chapters come from the repository that is created together with the
-              assessment.
+              {kind === "unbound"
+                ? "Push an app with a deploy/index.html entry point to the repository that is created with the task."
+                : "The description and chapters come from the repository that is created together with the assessment."}
             </p>
           </div>
 

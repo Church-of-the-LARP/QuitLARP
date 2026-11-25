@@ -24,6 +24,8 @@ import Pricing from "./pages/Pricing.tsx";
 import Landing from "./pages/Landing.tsx";
 import AssessmentPreview from "./pages/AssessmentPreview.tsx";
 import AssessmentSolveSingle from "./pages/AssessmentSolveSingle.tsx";
+import Events from "./pages/Events.tsx";
+import EventRoom from "./pages/EventRoom.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -44,6 +46,8 @@ createRoot(document.getElementById("root")!).render(
           <Route element={<SecuredRoute />}>
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/events" element={<Events />} />
+              <Route path="/events/:id" element={<EventRoom />} />
               <Route path="/assessments/:id/git" element={<AssessmentGit />} />
               <Route path="/assessments/:id/preview" element={<AssessmentPreview />} />
               <Route path="/assessments/:id/solve" element={<AssessmentSolveSingle />} />

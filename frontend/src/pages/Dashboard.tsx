@@ -159,14 +159,22 @@ function App() {
               </p>
               <h1 className="text-3xl font-bold text-ink">User stats</h1>
             </div>
-            {(user.role === "moderator" || user.role === "admin") && (
+            <div className="flex items-center gap-2">
               <Link
-                to="/create"
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell"
+                to="/events"
+                className="rounded-lg border border-line-hover bg-panel px-4 py-2 text-sm font-semibold text-muted transition hover:text-ink"
               >
-                Create assessment
+                Events
               </Link>
-            )}
+              {(user.role === "moderator" || user.role === "admin") && (
+                <Link
+                  to="/create"
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell"
+                >
+                  Create assessment
+                </Link>
+              )}
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-5 w-full sm:h-60">
             <div className="flex h-full w-full flex-col justify-center rounded-xl bg-surface px-5 py-5 text-center">

@@ -112,6 +112,7 @@ export default function AssessmentPreview() {
     user?.role === "admin" ||
     (user?.role === "moderator" && assessment.author?.id === user.id);
   const showRepositoryLink = canManageAssessment;
+  const isUnbound = assessment.kind === "unbound";
 
   return (
     <div className="flex flex-col items-center flex-1 py-20 px-4 sm:px-6 lg:px-8 w-screen">
@@ -130,15 +131,26 @@ export default function AssessmentPreview() {
         </div>
         <div className="flex flex-col sm:items-end gap-2">
           <div className="flex flex-row flex-wrap items-center gap-3 sm:gap-4">
-            <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
-              leaderboard & solutions
-            </button>
-            <Link
-              to={`/assessments/${id}/solve`}
-              className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg"
-            >
-              begin practice run
-            </Link>
+            {isUnbound ? (
+              <Link
+                to="/events"
+                className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg"
+              >
+                host an event with this task
+              </Link>
+            ) : (
+              <>
+                <button className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg">
+                  leaderboard &amp; solutions
+                </button>
+                <Link
+                  to={`/assessments/${id}/solve`}
+                  className="bg-accent-secondary hover:bg-accent-secondary-hover text-shell text-sm font-semibold px-6 py-3 rounded-lg"
+                >
+                  begin practice run
+                </Link>
+              </>
+            )}
           </div>
           {showRepositoryLink && (
             <Link
@@ -209,6 +221,11 @@ export default function AssessmentPreview() {
             <p>
               Chapters: <span className="text-ink">{chapters.length}</span>
             </p>
+            {isUnbound && (
+              <p>
+                Kind: <span className="text-ink">unbound web app</span>
+              </p>
+            )}
             <p>
               Updated:{" "}
               <span className="text-ink">
