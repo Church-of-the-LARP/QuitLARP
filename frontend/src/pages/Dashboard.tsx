@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { ChevronDown, X } from "lucide-react";
 import Alert from "../components/Alert.tsx";
 import useAuth from "../scripts/useAuth.tsx";
 import type { ActionResult } from "../types/types.ts";
@@ -13,6 +14,7 @@ import {
   type Difficulty,
   type TagCount,
 } from "../scripts/dashApi.ts";
+import { listUpcomingEvents, type EventSummary } from "../scripts/eventsApi.ts";
 
 const notifications = [
   {
@@ -45,7 +47,7 @@ function VerifyEmailBanner({
   };
 
   return (
-    <div className="mb-6 rounded-md bg-warning/80 px-4 py-3 text-sm text-shell">
+    <div className="relative mb-6 rounded-md bg-warning/80 px-4 py-3 text-sm text-shell">
       <p className="font-medium">Verify your email address</p>
       <p className="mt-0.5 text-shell/80">
         We emailed a verification link to{" "}
@@ -59,10 +61,12 @@ function VerifyEmailBanner({
         .
       </p>
       <button
-        className="absolute top-1 right-3 p-2 hover:text-panel"
+        aria-label="Dismiss"
+        title="Dismiss"
+        className="absolute top-1 right-3 rounded p-2 hover:text-panel"
         onClick={() => setCloseEmail(true)}
       >
-        X
+        <X aria-hidden="true" className="h-4 w-4" />
       </button>
       {alertMsg.error && <Alert kind="error" text={alertMsg.error} />}
       {alertMsg.notice && <Alert kind="notice" text={alertMsg.notice} />}
@@ -79,6 +83,7 @@ function App() {
   const firstLoad = useRef(true);
   const [publicTests, setPublicTests] = useState<AssessmentSummary[]>([]);
   const [upcomingTests, setUpcomingTests] = useState<ScheduledAssessment[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<EventSummary[]>([]);
   const [testCount, setTestCount] = useState(0);
   const [offset, setOffset] = useState(0);
   const [tags, setTags] = useState<TagCount[]>([]);
@@ -104,6 +109,9 @@ function App() {
     getScheduled()
       .then(setUpcomingTests)
       .catch(() => setUpcomingTests([]));
+    listUpcomingEvents()
+      .then(setUpcomingEvents)
+      .catch(() => setUpcomingEvents([]));
   }, []);
 
   useEffect(() => {
@@ -161,11 +169,19 @@ function App() {
             </div>
             <div className="flex items-center gap-2">
               <Link
-                to="/events"
+                to="/collaborations"
                 className="rounded-lg border border-line-hover bg-panel px-4 py-2 text-sm font-semibold text-muted transition hover:text-ink"
               >
-                Events
+                Collaboration
               </Link>
+              {(user.role === "moderator" || user.role === "admin") && (
+                <Link
+                  to="/interviews"
+                  className="rounded-lg border border-line-hover bg-panel px-4 py-2 text-sm font-semibold text-muted transition hover:text-ink"
+                >
+                  Host
+                </Link>
+              )}
               {(user.role === "moderator" || user.role === "admin") && (
                 <Link
                   to="/create"
@@ -209,33 +225,78 @@ function App() {
             Upcoming tests
           </h1>
           <div className="flex flex-nowrap overflow-auto justify-start items-center gap-5">
-            {upcomingTests.length > 0 ? (
-              upcomingTests.map((test, idx) => (
-                <div
-                  className="flex flex-col w-72 sm:w-96 shrink-0 rounded-xl bg-surface p-5 md:flex-row"
-                  key={idx}
-                >
-                  <div className="w-full">
-                    <h2 className="text-lg font-semibold text-ink">
-                      {test.title}
-                    </h2>
-                    <p className="mt-2 text-sm font-medium text-muted">
-                      {test.scheduledAt}
-                    </p>
-                    <p className="mt-1 text-sm text-muted">
-                      {test.timeLimitMinutes} minutes
-                    </p>
+            {upcomingEvents.length > 0 || upcomingTests.length > 0 ? (
+              <>
+                {upcomingEvents.map((upcomingEvent) => (
+                  <div
+                    className="flex w-72 shrink-0 flex-col rounded-xl bg-surface p-5 sm:w-96 md:flex-row"
+                    key={`event-${upcomingEvent.id}`}
+                  >
+                    <div className="w-full min-w-0">
+                      <h2 className="truncate text-lg font-semibold text-ink">
+                        {upcomingEvent.title}
+                      </h2>
+                      {upcomingEvent.description && (
+                        <p className="mt-1 line-clamp-2 text-xs text-muted">
+                          {upcomingEvent.description}
+                        </p>
+                      )}
+                      <p className="mt-2 text-sm font-medium text-muted">
+                        {upcomingEvent.endsAt
+                          ? `Ends ${new Date(upcomingEvent.endsAt).toLocaleString()}`
+                          : "No deadline"}
+                      </p>
+                      <p className="mt-1 text-sm text-muted">
+                        {upcomingEvent.taskCount} task
+                        {upcomingEvent.taskCount === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <div className="w-full content-center text-center md:w-32 md:content-end md:text-end">
+                      <Link
+                        to={
+                          upcomingEvent.monitored
+                            ? upcomingEvent.host?.id === user?.id
+                              ? `/interviews/${upcomingEvent.id}`
+                              : `/interviews/${upcomingEvent.id}/room`
+                            : `/collaborations/${upcomingEvent.id}`
+                        }
+                        className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell transition hover:bg-accent-light"
+                      >
+                        {upcomingEvent.monitored &&
+                        upcomingEvent.host?.id === user?.id
+                          ? "Monitor"
+                          : "Open"}
+                      </Link>
+                    </div>
                   </div>
-                  <div className="w-full md:w-40 text-center content-center md:content-end md:text-end">
-                    <Link
-                      to={`/assessments/${test.assessmentId}/preview`}
-                      className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell transition hover:bg-accent-light"
-                    >
-                      Take test
-                    </Link>
+                ))}
+                {upcomingTests.map((test, idx) => (
+                  <div
+                    className="flex flex-col w-72 sm:w-96 shrink-0 rounded-xl bg-surface p-5 md:flex-row"
+                    key={`scheduled-${test.id}-${idx}`}
+                  >
+                    <div className="w-full">
+                      <h2 className="text-lg font-semibold text-ink">
+                        {test.title}
+                      </h2>
+                      <p className="mt-2 text-sm font-medium text-muted">
+                        {test.scheduledAt}
+                      </p>
+                      <p className="mt-1 text-sm text-muted">
+                        {test.timeLimitMinutes} minutes
+                      </p>
+                    </div>
+                    <div className="w-full md:w-40 text-center content-center md:content-end md:text-end">
+                      <Link
+                        to={`/assessments/${test.assessmentId}/preview`}
+                        className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-shell transition hover:bg-accent-light"
+                      >
+                        Take test
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </>
             ) : (
               <div className="w-full flex items-center justify-center h-20">
                 <p>No upcoming tests</p>
@@ -302,17 +363,10 @@ function App() {
                       </option>
                     ))}
                   </select>
-                  <svg
-                    viewBox="0 0 12 12"
+                  <ChevronDown
+                    aria-hidden="true"
                     className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-dim"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M2 4l4 4 4-4" />
-                  </svg>
+                  />
                 </div>
               </div>
               <div className="flex flex-1 flex-col gap-1">

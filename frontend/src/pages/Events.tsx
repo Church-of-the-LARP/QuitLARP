@@ -1,41 +1,33 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import usePageTitle from "../scripts/usePageTitle.ts";
 import {
   createEvent,
   joinEvent,
-  listEvents,
-  listUnboundTasks,
-  type EventSummary,
+  listHostableTasks,
   type UnboundTask,
 } from "../scripts/eventsApi.ts";
 
 const inputClass =
   "w-full rounded-xl border border-line-hover bg-panel px-3 py-2 text-ink outline-none placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30";
 
-const statusStyles: Record<string, string> = {
-  draft: "bg-raised text-muted",
-  live: "bg-success/20 text-success",
-  ended: "bg-accent-secondary/20 text-accent-secondary",
-};
-
 export default function Events() {
-  usePageTitle("Events");
+  usePageTitle("Collaborations");
   const navigate = useNavigate();
-  const [events, setEvents] = useState<EventSummary[]>([]);
   const [tasks, setTasks] = useState<UnboundTask[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [selected, setSelected] = useState<number[]>([]);
+  const [selected, setSelected] = useState<number[]>(() => {
+    const raw = new URLSearchParams(window.location.search).get("task");
+    const taskID = Number(raw);
+    return Number.isInteger(taskID) && taskID > 0 ? [taskID] : [];
+  });
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    listEvents()
-      .then(setEvents)
-      .catch(() => setEvents([]));
-    listUnboundTasks()
+    listHostableTasks()
       .then(setTasks)
       .catch(() => setTasks([]));
   }, []);
@@ -52,7 +44,7 @@ export default function Events() {
     event.preventDefault();
     setError("");
     if (!title.trim()) {
-      setError("Give the event a title.");
+      setError("Give the collaboration a title.");
       return;
     }
     setBusy(true);
@@ -62,9 +54,11 @@ export default function Events() {
         description: description.trim(),
         taskIds: selected,
       });
-      navigate(`/events/${created.id}`);
+      navigate(`/collaborations/${created.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the event");
+      setError(
+        err instanceof Error ? err.message : "Could not create the collaboration",
+      );
     } finally {
       setBusy(false);
     }
@@ -77,9 +71,11 @@ export default function Events() {
     setBusy(true);
     try {
       const joined = await joinEvent(joinCode.trim());
-      navigate(`/events/${joined.id}`);
+      navigate(`/collaborations/${joined.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not join the event");
+      setError(
+        err instanceof Error ? err.message : "Could not join the collaboration",
+      );
     } finally {
       setBusy(false);
     }
@@ -92,19 +88,19 @@ export default function Events() {
           <p className="mb-2 text-xs font-semibold uppercase text-accent-light">
             Collaborative sessions
           </p>
-          <h1 className="text-3xl font-bold text-ink">Events</h1>
+          <h1 className="text-3xl font-bold text-ink">Collaborations</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted">
-            Host an interview or competition on unbound web-app tasks. Members
-            edit and push together in the browser; main deploys to a live
-            preview the host can watch next to the code.
+            Join with a code from your host, or create a collaboration on any
+            assessment. Unbound web-app tasks get shared workspaces; coding
+            tasks open as normal practice runs.
           </p>
         </div>
         <form onSubmit={handleJoin} className="flex items-center gap-2">
           <input
             value={joinCode}
             onChange={(event) => setJoinCode(event.target.value)}
-            placeholder="Join code"
-            aria-label="Join code"
+            placeholder="Collaboration code"
+            aria-label="Collaboration code"
             className={`${inputClass} w-40 font-mono uppercase`}
           />
           <button
@@ -123,45 +119,18 @@ export default function Events() {
         </div>
       )}
 
-      {events.length === 0 ? (
-        <p className="text-sm text-muted">
-          No events yet. Create one below, or join with a code from a host.
-        </p>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {events.map((event) => (
-            <Link
-              key={event.id}
-              to={`/events/${event.id}`}
-              className="flex flex-col gap-3 rounded-xl bg-surface p-5 transition hover:bg-raised/60"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="text-lg font-semibold text-ink">{event.title}</h2>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${statusStyles[event.status] ?? "bg-raised text-muted"}`}
-                >
-                  {event.status}
-                </span>
-              </div>
-              {event.description && (
-                <p className="line-clamp-2 text-sm text-muted">
-                  {event.description}
-                </p>
-              )}
-              <p className="mt-auto text-xs text-dim">
-                Hosted by {event.host?.username ?? "deleted user"} ·{" "}
-                {event.taskCount} task{event.taskCount === 1 ? "" : "s"}
-              </p>
-            </Link>
-          ))}
-        </div>
-      )}
+      <p className="text-sm text-muted">
+        Collaborations are private. Share the collaboration code with the people
+        who should join.
+      </p>
 
       <section className="rounded-xl border border-line-hover bg-surface p-6">
-        <h2 className="text-xl font-semibold text-ink">Host an event</h2>
+        <h2 className="text-xl font-semibold text-ink">
+          Host a collaboration
+        </h2>
         <p className="mt-1 text-sm text-muted">
-          Pick the unbound tasks members will build. Workspaces are created and
-          deployed when you start the event.
+          Pick the assessments to collaborate on. The collaboration is private:
+          share its code with the people who should join.
         </p>
         <form onSubmit={handleCreate} className="mt-5 flex flex-col gap-4">
           <div>
@@ -172,7 +141,7 @@ export default function Events() {
               id="event-title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="e.g. Frontend interview — build a kanban board"
+              placeholder="e.g. Pair on a landing page"
               className={inputClass}
             />
           </div>
@@ -192,12 +161,7 @@ export default function Events() {
             <p className="mb-2 text-sm font-semibold text-muted">Tasks</p>
             {tasks.length === 0 ? (
               <p className="text-sm text-muted">
-                No unbound tasks yet.{" "}
-                <Link to="/create?kind=unbound" className="font-semibold text-accent-light hover:text-accent-lighter">
-                  Create one
-                </Link>{" "}
-                by pushing an app with a <code className="font-mono">deploy/</code>{" "}
-                directory.
+                No assessments are available yet.
               </p>
             ) : (
               <div className="grid gap-2 sm:grid-cols-2">
@@ -212,11 +176,14 @@ export default function Events() {
                       onChange={() => toggleTask(task.id)}
                       className="mt-1 accent-accent"
                     />
-                    <span>
-                      <span className="block text-sm font-semibold text-ink">
-                        {task.title}
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+                        <span className="truncate">{task.title}</span>
+                        <span className="shrink-0 rounded-full bg-raised px-2 py-0.5 text-[10px] uppercase text-dim">
+                          {task.kind}
+                        </span>
                       </span>
-                      <span className="block line-clamp-2 text-xs text-muted">
+                      <span className="mt-0.5 line-clamp-3 text-xs text-muted">
                         {task.description}
                       </span>
                     </span>
@@ -230,7 +197,7 @@ export default function Events() {
             disabled={busy}
             className="self-start rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-shell transition hover:bg-accent-light disabled:opacity-60"
           >
-            {busy ? "Creating…" : "Create event"}
+            {busy ? "Creating…" : "Create collaboration"}
           </button>
         </form>
       </section>

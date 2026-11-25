@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import GuestRoute from "./components/GuestRoute.tsx";
 import SecuredRoute from "./components/SecuredRoute.tsx";
+import LegacyEventRedirect from "./components/LegacyEventRedirect.tsx";
 import Login from "./pages/Login.tsx";
 import Register from "./pages/Register.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
@@ -25,6 +26,8 @@ import Landing from "./pages/Landing.tsx";
 import AssessmentPreview from "./pages/AssessmentPreview.tsx";
 import AssessmentSolveSingle from "./pages/AssessmentSolveSingle.tsx";
 import Events from "./pages/Events.tsx";
+import EventsHost from "./pages/EventsHost.tsx";
+import InterviewMonitor from "./pages/InterviewMonitor.tsx";
 import EventRoom from "./pages/EventRoom.tsx";
 
 createRoot(document.getElementById("root")!).render(
@@ -46,8 +49,16 @@ createRoot(document.getElementById("root")!).render(
           <Route element={<SecuredRoute />}>
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/events" element={<Events />} />
-              <Route path="/events/:id" element={<EventRoom />} />
+              <Route path="/collaborations" element={<Events />} />
+              <Route path="/collaborations/:id" element={<EventRoom />} />
+              <Route element={<SecuredRoute roles={["moderator", "admin"]} />}>
+                <Route path="/interviews" element={<EventsHost />} />
+                <Route path="/interviews/:id" element={<InterviewMonitor />} />
+              </Route>
+              <Route path="/interviews/:id/room" element={<EventRoom />} />
+              <Route path="/events" element={<Navigate to="/collaborations" replace />} />
+              <Route path="/events/host" element={<Navigate to="/interviews" replace />} />
+              <Route path="/events/:id" element={<LegacyEventRedirect />} />
               <Route path="/assessments/:id/git" element={<AssessmentGit />} />
               <Route path="/assessments/:id/preview" element={<AssessmentPreview />} />
               <Route path="/assessments/:id/solve" element={<AssessmentSolveSingle />} />
