@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, File, FilePlus, Trash2, X } from "lucide-react";
+import { Link, useLocation, useParams } from "react-router-dom";
 import usePageTitle from "../scripts/usePageTitle.ts";
 import useAuth from "../scripts/useAuth.tsx";
 import { APP_THEME, defineAppTheme } from "../scripts/monacoTheme.ts";
 import {
   addAttemptMember,
-  addEventMember,
   applyEdit,
   commitAttempt,
   createAttempt,
@@ -17,37 +17,22 @@ import {
   EventsApiError,
   getEvent,
   getWorkspace,
-  joinAttempt,
   openStream,
   publishDeployment,
-  removeAttemptMember,
-  removeEventMember,
   startEvent,
-  type AttemptKind,
   type CollabDoc,
   type CollabMessage,
   type CollabOp,
   type EventAttempt,
   type EventDetail,
-  type EventMember,
   type EventTask,
   type Workspace,
 } from "../scripts/eventsApi.ts";
-
-const inputClass =
-  "w-full rounded-xl border border-line-hover bg-panel px-3 py-2 text-ink outline-none placeholder:text-dim focus:border-accent focus:ring-2 focus:ring-accent/30";
 
 const statusStyles: Record<string, string> = {
   draft: "bg-raised text-muted",
   live: "bg-success/20 text-success",
   ended: "bg-accent-secondary/20 text-accent-secondary",
-};
-
-const deploymentStyles: Record<string, string> = {
-  empty: "bg-raised text-dim",
-  deploying: "bg-warning/20 text-warning",
-  live: "bg-success/20 text-success",
-  failed: "bg-danger/20 text-danger",
 };
 
 const languageByExt: Record<string, string> = {
@@ -115,7 +100,11 @@ const docsToMap = (docs: CollabDoc[]) => {
 };
 
 export default function EventRoom() {
-  usePageTitle("Event");
+  const location = useLocation();
+  const isInterviewPath = location.pathname.startsWith("/interviews/");
+  const backTo = isInterviewPath ? "/dashboard" : "/collaborations";
+  const backLabel = isInterviewPath ? "Dashboard" : "Collaborations";
+  usePageTitle(isInterviewPath ? "Interview" : "Collaboration");
   const params = useParams();
   const eventId = Number(params.id);
   const { user } = useAuth();
@@ -125,19 +114,14 @@ export default function EventRoom() {
   const [activeAttemptId, setActiveAttemptId] = useState(0);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [activePath, setActivePath] = useState("");
+  const [openPaths, setOpenPaths] = useState<string[]>([]);
   const [content, setContent] = useState("");
   const [presence, setPresence] = useState<{ id: number; username: string }[]>([]);
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-
-  const [attemptName, setAttemptName] = useState("");
-  const [attemptKind, setAttemptKind] = useState<AttemptKind>("solo");
-  const [ownerUsername, setOwnerUsername] = useState("");
-  const [teamCode, setTeamCode] = useState("");
-  const [memberName, setMemberName] = useState("");
-  const [eventMemberName, setEventMemberName] = useState("");
+  const [inviteName, setInviteName] = useState("");
 
   const docsRef = useRef<Map<string, CollabDoc>>(new Map());
   const activePathRef = useRef("");
@@ -154,7 +138,9 @@ export default function EventRoom() {
   const activeTask: EventTask | undefined = event?.tasks.find(
     (task) => task.id === activeTaskId,
   );
-  const attempts = activeTask?.attempts ?? [];
+  const attempts = (activeTask?.attempts ?? []).filter(
+    (attempt) => !isInterviewPath || attempt.isMine,
+  );
   const activeAttempt: EventAttempt | undefined = attempts.find(
     (attempt) => attempt.id === activeAttemptId,
   );
@@ -193,7 +179,7 @@ export default function EventRoom() {
       });
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load the event");
+      setError(err instanceof Error ? err.message : "Could not load the session");
     }
   };
 
@@ -227,12 +213,16 @@ export default function EventRoom() {
       setActiveAttemptId(0);
       return;
     }
-    setActiveAttemptId((current) =>
-      current && activeTask.attempts.some((attempt) => attempt.id === current)
+    setActiveAttemptId((current) => {
+      const visible = (activeTask?.attempts ?? []).filter(
+        (attempt) => !isInterviewPath || attempt.isMine,
+      );
+      return current && visible.some((attempt) => attempt.id === current)
         ? current
-        : activeTask.attempts[0]?.id ?? 0,
-    );
-  }, [activeTaskId, event]);
+        : visible[0]?.id ?? 0;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTaskId, event, isInterviewPath]);
 
   useEffect(() => {
     attemptIdRef.current = activeAttemptId;
@@ -242,6 +232,7 @@ export default function EventRoom() {
     setWorkspace(null);
     setDirty(false);
     setActiveFile("", "");
+    setOpenPaths([]);
     setPresence([]);
     if (activeAttemptId) void reloadWorkspace(activeAttemptId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -431,7 +422,24 @@ export default function EventRoom() {
     }
     const doc = docsRef.current.get(path);
     if (doc) {
+      setOpenPaths((current) =>
+        current.includes(doc.path) ? current : [...current, doc.path],
+      );
       setActiveFile(doc.path, doc.content);
+    }
+  };
+
+  const closeTab = (path: string) => {
+    const index = openPaths.indexOf(path);
+    const next = openPaths.filter((entry) => entry !== path);
+    setOpenPaths(next);
+    if (activePath !== path) return;
+    const fallback = next[Math.min(index, next.length - 1)];
+    const doc = fallback ? docsRef.current.get(fallback) : undefined;
+    if (doc) {
+      setActiveFile(doc.path, doc.content);
+    } else {
+      setActiveFile("", "");
     }
   };
 
@@ -445,7 +453,12 @@ export default function EventRoom() {
       docsRef.current = docsToMap(loaded.docs);
       setDirty(loaded.dirty);
       const doc = docsRef.current.get(name.trim());
-      if (doc) setActiveFile(doc.path, doc.content);
+      if (doc) {
+        setOpenPaths((current) =>
+          current.includes(doc.path) ? current : [...current, doc.path],
+        );
+        setActiveFile(doc.path, doc.content);
+      }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Could not create the file");
     }
@@ -458,58 +471,49 @@ export default function EventRoom() {
       setWorkspace(loaded);
       docsRef.current = docsToMap(loaded.docs);
       setDirty(loaded.dirty);
+      setOpenPaths((current) => current.filter((entry) => entry !== path));
       if (activePathRef.current === path) setActiveFile("", "");
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Could not delete the file");
     }
   };
 
-  const handleCreateAttempt = async (submit: React.FormEvent<HTMLFormElement>) => {
-    submit.preventDefault();
-    if (!activeTask) return;
+  const handleStartWorkspace = async () => {
+    if (!activeTask || busy) return;
     setBusy(true);
     try {
       const created = await createAttempt(eventId, activeTask.id, {
-        kind: attemptKind,
-        name: attemptName.trim() || undefined,
-        ownerUsername: ownerUsername.trim() || undefined,
+        kind: "solo",
+        name: user?.username,
       });
       setActiveAttemptId(created.id);
       await loadEvent();
-      setAttemptName("");
-      setOwnerUsername("");
-      setNotice("Attempt created and deployed from its initial commit.");
+      setNotice("Workspace ready.");
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not create the attempt");
+      setNotice(
+        err instanceof Error ? err.message : "Could not start the workspace",
+      );
     } finally {
       setBusy(false);
     }
   };
 
-  const handleJoinTeam = async (submit: React.FormEvent<HTMLFormElement>) => {
+  const handleInvite = async (submit: React.FormEvent<HTMLFormElement>) => {
     submit.preventDefault();
-    if (!teamCode.trim()) return;
-    setBusy(true);
+    if (!activeAttempt || !inviteName.trim()) return;
     try {
-      const joined = await joinAttempt(teamCode.trim());
-      setEvent(joined);
-      const joinedAttempt = joined.tasks
-        .flatMap((task) => task.attempts)
-        .find(
-          (attempt) =>
-            attempt.isMine &&
-            attempt.joinCode?.toUpperCase() === teamCode.trim().toUpperCase(),
-        );
-      if (joinedAttempt) {
-        setActiveTaskId(joinedAttempt.eventTaskId);
-        setActiveAttemptId(joinedAttempt.id);
-      }
-      setTeamCode("");
-      setNotice("Joined the team attempt.");
+      const updated = await addAttemptMember(
+        eventId,
+        activeAttempt.id,
+        inviteName.trim(),
+      );
+      updateAttempt(updated);
+      setInviteName("");
+      setNotice("Collaborator invited.");
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not join the team");
-    } finally {
-      setBusy(false);
+      setNotice(
+        err instanceof Error ? err.message : "Could not invite the collaborator",
+      );
     }
   };
 
@@ -537,9 +541,9 @@ export default function EventRoom() {
     setBusy(true);
     try {
       setEvent(await startEvent(eventId));
-      setNotice("Event is live. Participants can create attempts.");
+      setNotice("Session is live. Participants can create attempts.");
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not start the event");
+      setNotice(err instanceof Error ? err.message : "Could not start the session");
     } finally {
       setBusy(false);
     }
@@ -553,7 +557,7 @@ export default function EventRoom() {
     if (
       dirtyAttempts.length > 0 &&
       !window.confirm(
-        `${dirtyAttempts.length} attempt(s) have uncommitted editor changes. Those changes will not be deployed. End the event anyway?`,
+        `${dirtyAttempts.length} attempt(s) have uncommitted editor changes. Those changes will not be deployed. End the session anyway?`,
       )
     ) {
       return;
@@ -561,9 +565,9 @@ export default function EventRoom() {
     setBusy(true);
     try {
       setEvent(await endEvent(eventId));
-      setNotice("Event ended. Attempts are read-only.");
+      setNotice("Session ended. Attempts are read-only.");
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not end the event");
+      setNotice(err instanceof Error ? err.message : "Could not end the session");
     } finally {
       setBusy(false);
     }
@@ -600,50 +604,6 @@ export default function EventRoom() {
     }
   };
 
-  const handleAddAttemptMember = async (submit: React.FormEvent<HTMLFormElement>) => {
-    submit.preventDefault();
-    if (!activeAttempt || !memberName.trim()) return;
-    try {
-      const updated = await addAttemptMember(
-        eventId,
-        activeAttempt.id,
-        memberName.trim(),
-      );
-      updateAttempt(updated);
-      setMemberName("");
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not add the member");
-    }
-  };
-
-  const handleRemoveAttemptMember = async (member: { userId: number }) => {
-    if (!activeAttempt) return;
-    try {
-      updateAttempt(await removeAttemptMember(eventId, activeAttempt.id, member.userId));
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not remove the member");
-    }
-  };
-
-  const handleAddEventMember = async (submit: React.FormEvent<HTMLFormElement>) => {
-    submit.preventDefault();
-    if (!eventMemberName.trim()) return;
-    try {
-      setEvent(await addEventMember(eventId, eventMemberName.trim()));
-      setEventMemberName("");
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not add the member");
-    }
-  };
-
-  const handleRemoveEventMember = async (member: EventMember) => {
-    try {
-      setEvent(await removeEventMember(eventId, member.userId));
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not remove the member");
-    }
-  };
-
   const copy = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -657,8 +617,8 @@ export default function EventRoom() {
     return (
       <main className="mx-auto w-[calc(100%-2rem)] py-10 lg:w-[75vw]">
         <div className="rounded-xl bg-surface p-6 text-danger">{error}</div>
-        <Link to="/events" className="mt-4 inline-block text-sm font-semibold text-accent-light">
-          Back to events
+        <Link to={backTo} className="mt-4 inline-block text-sm font-semibold text-accent-light">
+          Back to {backLabel}
         </Link>
       </main>
     );
@@ -668,20 +628,21 @@ export default function EventRoom() {
   }
 
   const readOnly = !activeAttempt?.canEdit;
-  const canManageAttempt =
-    event.isHost ||
-    activeAttempt?.members.some(
-      (member) => member.userId === user?.id && member.role === "owner",
-    );
   const repoUrl = activeAttempt?.repoUrl;
 
   return (
     <main className="mx-auto flex w-[calc(100%-2rem)] flex-col gap-5 py-6 lg:w-[95vw] 2xl:w-[80vw]">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link to="/events" className="text-xs font-semibold uppercase text-accent-light">
-            ← Events
-          </Link>
+          {!event.solo && (
+            <Link
+              to={backTo}
+              className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-accent-light"
+            >
+              <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
+              {backLabel}
+            </Link>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold text-ink">{event.title}</h1>
             <span
@@ -689,11 +650,11 @@ export default function EventRoom() {
             >
               {event.status}
             </span>
-            {event.isHost && event.joinCode && (
+            {event.isHost && event.joinCode && !event.solo && !isInterviewPath && (
               <button
                 onClick={() => copy(event.joinCode!)}
                 className="rounded-full bg-panel px-3 py-1 font-mono text-xs text-muted hover:text-ink"
-                title="Copy event join code"
+                title="Copy session join code"
               >
                 code: {event.joinCode}
               </button>
@@ -702,25 +663,25 @@ export default function EventRoom() {
           {event.description && <p className="mt-2 max-w-3xl text-sm text-muted">{event.description}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {event.isHost && event.status === "draft" && (
+          {event.isHost && event.status === "draft" && !isInterviewPath && (
             <button
               onClick={handleStart}
               disabled={busy}
               className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-shell hover:bg-accent-light disabled:opacity-60"
             >
-              Start event
+              Start session
             </button>
           )}
-          {event.isHost && event.status === "live" && (
+          {event.isHost && event.status === "live" && !event.solo && !isInterviewPath && (
             <button
               onClick={handleEnd}
               disabled={busy}
               className="rounded-xl border border-line-hover bg-panel px-4 py-2 text-sm font-semibold text-muted hover:text-ink disabled:opacity-60"
             >
-              End event
+              End session
             </button>
           )}
-          {activeAttempt && event.isHost && (
+          {activeAttempt && event.isHost && !isInterviewPath && (
             <button
               onClick={handleRedeploy}
               disabled={busy}
@@ -729,7 +690,7 @@ export default function EventRoom() {
               Redeploy main
             </button>
           )}
-          {activeAttempt && event.isHost && event.status === "ended" && (
+          {activeAttempt && event.isHost && event.status === "ended" && !isInterviewPath && (
             <button
               onClick={handlePublish}
               disabled={busy}
@@ -751,217 +712,156 @@ export default function EventRoom() {
 
       {event.tasks.length === 0 ? (
         <div className="rounded-xl bg-surface p-6 text-muted">
-          This event has no unbound tasks attached.
+          This session has no tasks attached.
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            {event.tasks.map((task) => (
-              <button
-                key={task.id}
-                onClick={() => setActiveTaskId(task.id)}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  task.id === activeTaskId
-                    ? "bg-accent text-shell"
-                    : "bg-surface text-muted hover:text-ink"
-                }`}
-              >
-                {task.title}
-              </button>
-            ))}
-          </div>
+          {event.tasks.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {event.tasks.map((task) => (
+                <button
+                  key={task.id}
+                  onClick={() => setActiveTaskId(task.id)}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                    task.id === activeTaskId
+                      ? "bg-accent text-shell"
+                      : "bg-surface text-muted hover:text-ink"
+                  }`}
+                >
+                  {task.title}
+                </button>
+              ))}
+            </div>
+          )}
 
           {event.status === "draft" ? (
             <div className="rounded-xl bg-surface p-6 text-muted">
-              Start the event so participants can create solo or team attempts.
+              The host must start the session before workspaces can be opened.
             </div>
           ) : (
             <>
-              {activeTask && (
-                <section className="rounded-xl bg-surface p-4">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-dim">
-                        Attempts for {activeTask.title}
-                      </p>
+              {activeTask &&
+                activeTask.kind === "unbound" &&
+                !activeAttempt && (
+                  <section className="rounded-xl bg-surface p-5">
+                    {event.status === "live" ? (
+                      <>
+                        <p className="text-sm text-muted">
+                          Start your workspace for this task.
+                        </p>
+                        <button
+                          onClick={() => void handleStartWorkspace()}
+                          disabled={busy}
+                          className="mt-3 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-shell hover:bg-accent-light disabled:opacity-60"
+                        >
+                          {busy ? "Starting…" : "Start workspace"}
+                        </button>
+                      </>
+                    ) : (
                       <p className="text-sm text-muted">
-                        {event.isHost
-                          ? "Every solo attempt and team gets its own repo and deployment."
-                          : "Your solo or team workspace. Changes only deploy after you commit."}
+                        No workspace is available for this session.
+                      </p>
+                    )}
+                  </section>
+                )}
+
+              {activeTask?.kind === "leetcode" && (
+                <section className="rounded-xl bg-surface p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase text-dim">
+                        Coding task
+                      </p>
+                      <h2 className="mt-1 text-lg font-semibold text-ink">
+                        {activeTask.title}
+                      </h2>
+                      <p className="mt-2 line-clamp-3 max-w-2xl text-sm text-muted">
+                        {activeTask.description}
                       </p>
                     </div>
-                    {activeTask.attempts.length === 0 && event.status === "live" && (
-                      <span className="text-xs text-dim">
-                        No attempts yet — create one below.
-                      </span>
-                    )}
+                    <Link
+                      to={`/assessments/${activeTask.assessmentId}/preview`}
+                      className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-shell hover:bg-accent-light"
+                    >
+                      Open assessment
+                    </Link>
                   </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {activeTask.attempts.map((attempt) => (
-                      <button
-                        key={attempt.id}
-                        onClick={() => setActiveAttemptId(attempt.id)}
-                        className={`flex min-w-52 flex-col items-start gap-1 rounded-xl border px-3 py-2 text-left transition ${
-                          attempt.id === activeAttemptId
-                            ? "border-accent bg-accent/10"
-                            : "border-line-hover bg-panel hover:bg-raised/60"
-                        }`}
-                      >
-                        <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-                          {attempt.name}
-                          {attempt.dirty && (
-                            <span className="h-2 w-2 rounded-full bg-warning" title="Uncommitted changes" />
-                          )}
-                        </span>
-                        <span className="text-xs text-muted">
-                          {attempt.kind === "team" ? "team" : "solo"} ·{" "}
-                          {attempt.owner?.username ?? "deleted user"}
-                          {attempt.members.length > 1
-                            ? ` +${attempt.members.length - 1}`
-                            : ""}
-                        </span>
-                        <span className="flex items-center gap-2 text-xs">
-                          <span
-                            className={`rounded-full px-2 py-0.5 uppercase ${deploymentStyles[attempt.deployment.status] ?? "bg-raised text-dim"}`}
-                          >
-                            {attempt.deployment.status}
-                          </span>
-                          {attempt.deployment.commitSha && (
-                            <span className="font-mono text-dim">
-                              {attempt.deployment.commitSha.slice(0, 8)}
-                            </span>
-                          )}
-                          {attempt.deployment.status === "live" && (
-                            <a
-                              href={attempt.deployment.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(event) => event.stopPropagation()}
-                              className="font-semibold text-accent-light hover:text-accent-lighter"
-                            >
-                              open
-                            </a>
-                          )}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {event.status === "live" && (
-                    <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-line pt-4">
-                      <form onSubmit={handleCreateAttempt} className="flex flex-wrap items-end gap-2">
-                        <div>
-                          <label className="mb-1 block text-xs font-semibold uppercase text-dim">
-                            New attempt
-                          </label>
-                          <div className="flex gap-2">
-                            <select
-                              value={attemptKind}
-                              onChange={(event) => setAttemptKind(event.target.value as AttemptKind)}
-                              className={`${inputClass} w-28`}
-                            >
-                              <option value="solo">Solo</option>
-                              <option value="team">Team</option>
-                            </select>
-                            <input
-                              value={attemptName}
-                              onChange={(event) => setAttemptName(event.target.value)}
-                              placeholder={attemptKind === "team" ? "team name" : "attempt name"}
-                              className={`${inputClass} w-44`}
-                            />
-                            {event.isHost && (
-                              <input
-                                value={ownerUsername}
-                                onChange={(event) => setOwnerUsername(event.target.value)}
-                                placeholder="owner username (optional)"
-                                className={`${inputClass} w-52`}
-                              />
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={busy}
-                          className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-shell hover:bg-accent-light disabled:opacity-60"
-                        >
-                          Create attempt
-                        </button>
-                      </form>
-
-                      <form onSubmit={handleJoinTeam} className="flex items-end gap-2">
-                        <div>
-                          <label className="mb-1 block text-xs font-semibold uppercase text-dim">
-                            Join a team
-                          </label>
-                          <input
-                            value={teamCode}
-                            onChange={(event) => setTeamCode(event.target.value)}
-                            placeholder="invite code"
-                            className={`${inputClass} w-36 font-mono uppercase`}
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={busy}
-                          className="rounded-xl border border-line-hover bg-panel px-3 py-2 text-sm font-semibold text-muted hover:text-ink disabled:opacity-60"
-                        >
-                          Join
-                        </button>
-                      </form>
-                    </div>
-                  )}
                 </section>
               )}
 
               {activeAttempt ? (
-                <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_minmax(0,1fr)]">
-                  <aside className="flex min-h-64 flex-col rounded-xl bg-surface p-3">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-ink">
-                          {activeAttempt.name}
-                        </p>
-                        <p className="truncate text-xs text-dim">
-                          {activeAttempt.kind === "team" ? "team" : "solo"} workspace
-                        </p>
+                <div className="grid min-h-[70vh] gap-2 rounded-xl bg-panel p-4 xl:grid-cols-[240px_minmax(0,1fr)]">
+                  <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl bg-surface p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-dim">
+                        Explorer
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={handleCreateFile}
+                          disabled={readOnly}
+                          title="New file"
+                          className="rounded p-1 text-muted hover:bg-raised/60 hover:text-ink disabled:opacity-40"
+                        >
+                          <FilePlus aria-hidden="true" className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => activePath && handleDeleteFile(activePath)}
+                          disabled={readOnly || !activePath}
+                          title="Delete active file"
+                          className="rounded p-1 text-muted hover:bg-raised/60 hover:text-danger disabled:opacity-40"
+                        >
+                          <Trash2 aria-hidden="true" className="h-4 w-4" />
+                        </button>
                       </div>
-                      <button
-                        onClick={handleCreateFile}
-                        disabled={readOnly}
-                        className="rounded-lg bg-panel px-2 py-1 text-xs font-semibold text-muted hover:text-ink disabled:opacity-40"
-                      >
-                        + file
-                      </button>
                     </div>
-                    <ul className="flex flex-col overflow-auto">
-                      {visiblePaths.map((path) => (
-                        <li key={path} className="group flex items-center gap-1">
-                          <button
-                            onClick={() => openFile(path)}
-                            className={`flex-1 truncate rounded-lg px-2 py-1 text-left font-mono text-xs transition hover:bg-raised/60 ${
-                              activePath === path ? "text-accent-light" : "text-muted"
-                            } ${binaryPaths.has(path) ? "opacity-60" : ""}`}
-                          >
-                            {path}
-                            {docsRef.current.get(path)?.dirty ? " *" : ""}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteFile(path)}
-                            disabled={readOnly}
-                            className="hidden rounded px-1 text-xs text-dim hover:text-danger group-hover:block disabled:opacity-40"
-                            title="Remove file"
-                          >
-                            ×
-                          </button>
-                        </li>
-                      ))}
+                    <div className="mb-2 px-1">
+                      <p className="truncate text-xs text-muted">
+                        {activeAttempt.name}
+                      </p>
+                      <p className="text-[11px] uppercase tracking-wide text-dim">
+                        {activeAttempt.kind === "team" ? "team" : "solo"} workspace
+                      </p>
+                    </div>
+                    <ul className="flex min-h-0 flex-1 flex-col overflow-auto font-mono text-[13px]">
+                      {visiblePaths.map((path) => {
+                        const segments = path.split("/");
+                        const name = segments[segments.length - 1];
+                        return (
+                          <li key={path} className="group flex items-center gap-1">
+                            <button
+                              onClick={() => openFile(path)}
+                              title={path}
+                              style={{ paddingLeft: `${8 + (segments.length - 1) * 12}px` }}
+                              className={`flex min-w-0 flex-1 items-center gap-2 rounded py-1 pr-1 text-left transition hover:bg-raised/40 ${
+                                activePath === path ? "bg-raised/40 text-ink" : "text-muted"
+                              } ${binaryPaths.has(path) ? "opacity-60" : ""}`}
+                            >
+                              <File aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-dim" />
+                              <span className="truncate">{name}</span>
+                              {docsRef.current.get(path)?.dirty && (
+                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-light" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFile(path)}
+                              disabled={readOnly}
+                              className="hidden rounded p-0.5 text-dim hover:text-danger group-hover:block disabled:opacity-40"
+                              title="Remove file"
+                            >
+                              <X aria-hidden="true" className="h-3.5 w-3.5" />
+                            </button>
+                          </li>
+                        );
+                      })}
                       {visiblePaths.length === 0 && (
                         <li className="px-2 py-1 text-xs text-dim">No files</li>
                       )}
                     </ul>
-                    <div className="mt-auto border-t border-line pt-3">
-                      <p className="text-xs font-semibold uppercase text-dim">In the room</p>
+                    <div className="mt-2 border-t border-line pt-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-dim">
+                        In the room
+                      </p>
                       <ul className="mt-1 flex flex-wrap gap-1">
                         {presence.map((member) => (
                           <li
@@ -975,50 +875,157 @@ export default function EventRoom() {
                           <li className="text-xs text-dim">Only you</li>
                         )}
                       </ul>
+                      {event.monitored &&
+                        event.allowInvites &&
+                        activeAttempt &&
+                        (event.isHost || activeAttempt.owner?.id === user?.id) && (
+                          <form onSubmit={handleInvite} className="mt-2 flex gap-1">
+                            <input
+                              value={inviteName}
+                              onChange={(event) => setInviteName(event.target.value)}
+                              placeholder="invite username"
+                              className="min-w-0 flex-1 rounded-lg bg-panel px-2 py-1 text-xs text-ink outline-none placeholder:text-dim focus:ring-1 focus:ring-accent/40"
+                            />
+                            <button
+                              type="submit"
+                              className="rounded-lg bg-accent px-2 py-1 text-xs font-semibold text-shell hover:bg-accent-light"
+                            >
+                              Invite
+                            </button>
+                          </form>
+                        )}
                     </div>
                   </aside>
 
-                  <section className="flex min-h-[60vh] flex-col overflow-hidden rounded-xl bg-surface">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
-                      <span className="truncate font-mono text-xs text-muted">
-                        {activePath || "Select a file to edit"}
-                      </span>
-                      <span className="text-xs text-dim">
-                        {readOnly ? "read-only" : dirty ? "uncommitted changes" : "clean"}
-                      </span>
+                  <section className="flex min-h-0 flex-col overflow-hidden rounded-xl bg-surface">
+                    <div className="flex items-center justify-between gap-2 border-b border-line px-2">
+                      <div className="flex min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
+                        {openPaths.length === 0 ? (
+                          <span className="px-2 py-2 text-xs text-dim">
+                            Open a file from the explorer
+                          </span>
+                        ) : (
+                          openPaths.map((path) => {
+                            const name = path.split("/").pop() ?? path;
+                            const isDirty = docsRef.current.get(path)?.dirty;
+                            return (
+                              <div
+                                key={path}
+                                role="button"
+                                tabIndex={0}
+                                title={path}
+                                onClick={() => openFile(path)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    openFile(path);
+                                  }
+                                }}
+                                className={`flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] transition ${
+                                  activePath === path
+                                    ? "border-accent text-ink"
+                                    : "border-line text-muted hover:border-line-hover hover:text-ink"
+                                }`}
+                              >
+                                <span>{name}</span>
+                                {isDirty && (
+                                  <span className="h-2 w-2 rounded-full bg-accent-light" />
+                                )}
+                                <button
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    closeTab(path);
+                                  }}
+                                  title="Close"
+                                  className="rounded px-1 text-dim hover:bg-raised hover:text-ink"
+                                >
+                                  <X aria-hidden="true" className="h-3 w-3" />
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2 py-1">
+                        {activePath && (
+                          <>
+                            <span className="rounded-md border border-accent-secondary/40 bg-accent-secondary/15 px-2 py-0.5 font-mono text-[11px] text-accent-secondary-hover">
+                              {languageOf(activePath)}
+                            </span>
+                            <span className="hidden rounded-md border border-line bg-surface px-2 py-0.5 font-mono text-[11px] text-dim sm:inline">
+                              {activePath.split("/").pop()}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <Editor
-                      height="60vh"
-                      language={languageOf(activePath)}
-                      value={content}
-                      onChange={(value) => {
-                        const next = value ?? "";
-                        if (next === contentRef.current) return;
-                        contentRef.current = next;
-                        setContent(next);
-                        if (!readOnly && activePath) {
-                          setDirty(true);
-                          scheduleSend();
-                        }
-                      }}
-                      theme={APP_THEME}
-                      beforeMount={defineAppTheme}
-                      options={{
-                        automaticLayout: true,
-                        readOnly: readOnly || !activePath,
-                        padding: { top: 8, bottom: 8 },
-                        minimap: { enabled: false },
-                        fontSize: 13,
-                      }}
-                      className="overflow-hidden"
-                    />
-                    {activeAttempt.canEdit && (
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-3 py-2">
-                        <p className="text-xs text-dim">
-                          {dirty
-                            ? "Edits stay in the live editor until you commit."
-                            : "Workspace matches git main."}
-                        </p>
+                    <div className="relative min-h-[55vh] flex-1 overflow-hidden">
+                      <Editor
+                        height="100%"
+                        language={languageOf(activePath)}
+                        value={content}
+                        onChange={(value) => {
+                          const next = value ?? "";
+                          if (next === contentRef.current) return;
+                          contentRef.current = next;
+                          setContent(next);
+                          if (!readOnly && activePath) {
+                            setDirty(true);
+                            scheduleSend();
+                          }
+                        }}
+                        theme={APP_THEME}
+                        beforeMount={defineAppTheme}
+                        options={{
+                          automaticLayout: true,
+                          readOnly: readOnly || !activePath,
+                          padding: { top: 8, bottom: 8 },
+                          minimap: { enabled: false },
+                          fontSize: 13,
+                        }}
+                        className="overflow-hidden"
+                      />
+                      {!activePath && (
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-dim">
+                          Open a file from the explorer
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-3 py-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-dim">
+                        <span>
+                          {readOnly
+                            ? "read-only"
+                            : dirty
+                              ? "uncommitted changes"
+                              : "clean"}
+                        </span>
+                        <span>·</span>
+                        <span className="truncate">
+                          {activeAttempt.deployment.status === "live"
+                            ? `main @ ${activeAttempt.deployment.commitSha.slice(0, 8)}`
+                            : activeAttempt.deployment.status}
+                        </span>
+                        {activeAttempt.deployment.status === "failed" && (
+                          <span
+                            className="max-w-md truncate text-danger"
+                            title={activeAttempt.deployment.error}
+                          >
+                            {activeAttempt.deployment.error}
+                          </span>
+                        )}
+                        {activeAttempt.deployment.url && (
+                          <a
+                            href={activeAttempt.deployment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-semibold text-accent-light hover:text-accent-lighter"
+                          >
+                            Open deployment
+                          </a>
+                        )}
+                      </div>
+                      {activeAttempt.canEdit && (
                         <button
                           onClick={handleCommit}
                           disabled={busy || !dirty}
@@ -1026,188 +1033,29 @@ export default function EventRoom() {
                         >
                           {busy ? "Committing…" : "Commit & deploy"}
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </section>
 
-                  <section className="flex min-h-[60vh] flex-col rounded-xl bg-surface p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-semibold uppercase text-dim">
-                          Deployment (from git main)
-                        </p>
-                        <p className="text-sm font-semibold text-ink">
-                          {activeAttempt.deployment.status === "live"
-                            ? `main @ ${activeAttempt.deployment.commitSha.slice(0, 8)}`
-                            : activeAttempt.deployment.status}
-                        </p>
-                      </div>
-                      {activeAttempt.deployment.url && (
-                        <a
-                          href={activeAttempt.deployment.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-semibold text-accent-light hover:text-accent-lighter"
-                        >
-                          Open
-                        </a>
-                      )}
-                    </div>
-                    {dirty && (
-                      <p className="mt-2 rounded-lg bg-warning/10 px-2 py-1 text-xs text-warning">
-                        The editor has uncommitted changes. They are not part of
-                        the deployment.
-                      </p>
-                    )}
-                    {activeAttempt.deployment.status === "failed" && (
-                      <p className="mt-2 whitespace-pre-wrap rounded-lg bg-danger/10 p-2 text-xs text-danger">
-                        {activeAttempt.deployment.error}
-                      </p>
-                    )}
-                    <div className="mt-3 flex-1 overflow-hidden rounded-lg bg-panel">
-                      {activeAttempt.deployment.status === "live" ? (
-                        <iframe
-                          key={`${activeAttempt.deployment.commitSha}-${activeAttempt.deployment.deployedAt ?? ""}`}
-                          src={activeAttempt.deployment.url}
-                          title="Deployment preview"
-                          sandbox="allow-scripts allow-forms allow-popups allow-modals"
-                          className="h-[54vh] w-full bg-white"
-                        />
-                      ) : (
-                        <div className="flex h-full min-h-40 items-center justify-center px-4 text-center text-sm text-muted">
-                          Nothing deployed yet. Commit the workspace to main to
-                          deploy it.
-                        </div>
-                      )}
-                    </div>
-                    {repoUrl && (
-                      <button
-                        onClick={() => copy(repoUrl)}
-                        className="mt-2 truncate text-left font-mono text-xs text-dim hover:text-ink"
-                        title="Copy clone URL"
-                      >
-                        {repoUrl}
-                      </button>
-                    )}
-                  </section>
+                  {repoUrl && (
+                    <button
+                      onClick={() => copy(repoUrl)}
+                      className="col-span-full truncate text-left font-mono text-xs text-dim hover:text-ink"
+                      title="Copy clone URL"
+                    >
+                      {repoUrl}
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-xl bg-surface p-6 text-muted">
                   {event.status === "live"
-                    ? "Create a solo or team attempt to start building."
-                    : "No attempt is visible for this task."}
+                    ? "Start your workspace above to open the editor."
+                    : "No workspace is available for this session."}
                 </div>
-              )}
-
-              {activeAttempt && (
-                <section className="rounded-xl bg-surface p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-ink">
-                        {activeAttempt.name} members
-                      </h2>
-                      <p className="text-xs text-muted">
-                        {activeAttempt.kind === "team"
-                          ? "Team members share this workspace."
-                          : "Solo attempt."}
-                      </p>
-                    </div>
-                    {activeAttempt.joinCode && (
-                      <button
-                        onClick={() => copy(activeAttempt.joinCode!)}
-                        className="rounded-full bg-panel px-3 py-1 font-mono text-xs text-muted hover:text-ink"
-                        title="Copy team invite code"
-                      >
-                        invite: {activeAttempt.joinCode}
-                      </button>
-                    )}
-                  </div>
-                  <ul className="mt-3 flex flex-wrap gap-2">
-                    {activeAttempt.members.map((member) => (
-                      <li
-                        key={member.userId}
-                        className="flex items-center gap-2 rounded-full bg-panel px-3 py-1 text-sm text-muted"
-                      >
-                        <span className={member.role === "owner" ? "text-accent-light" : ""}>
-                          {member.username}
-                        </span>
-                        <span className="text-xs uppercase text-dim">{member.role}</span>
-                        {canManageAttempt && member.role !== "owner" && (
-                          <button
-                            onClick={() => handleRemoveAttemptMember(member)}
-                            className="text-dim hover:text-danger"
-                            title="Remove member"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                  {canManageAttempt && activeAttempt.kind === "team" && (
-                    <form onSubmit={handleAddAttemptMember} className="mt-3 flex items-center gap-2">
-                      <input
-                        value={memberName}
-                        onChange={(event) => setMemberName(event.target.value)}
-                        placeholder="username"
-                        className={`${inputClass} w-48`}
-                      />
-                      <button
-                        type="submit"
-                        className="rounded-xl border border-line-hover bg-panel px-3 py-2 text-sm font-semibold text-muted hover:text-ink"
-                      >
-                        Add to team
-                      </button>
-                    </form>
-                  )}
-                </section>
               )}
             </>
           )}
-
-          <section className="rounded-xl bg-surface p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-ink">Event members</h2>
-              {event.isHost && (
-                <form onSubmit={handleAddEventMember} className="flex items-center gap-2">
-                  <input
-                    value={eventMemberName}
-                    onChange={(input) => setEventMemberName(input.target.value)}
-                    placeholder="username"
-                    className={`${inputClass} w-40`}
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-xl border border-line-hover bg-panel px-3 py-2 text-sm font-semibold text-muted hover:text-ink"
-                  >
-                    Add
-                  </button>
-                </form>
-              )}
-            </div>
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {event.members.map((member) => (
-                <li
-                  key={member.userId}
-                  className="flex items-center gap-2 rounded-full bg-panel px-3 py-1 text-sm text-muted"
-                >
-                  <span className={member.role === "host" ? "text-accent-light" : ""}>
-                    {member.username}
-                  </span>
-                  <span className="text-xs uppercase text-dim">{member.role}</span>
-                  {event.isHost && member.role !== "host" && (
-                    <button
-                      onClick={() => handleRemoveEventMember(member)}
-                      className="text-dim hover:text-danger"
-                      title="Remove member"
-                    >
-                      ×
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
         </>
       )}
     </main>
