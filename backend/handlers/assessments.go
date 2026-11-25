@@ -26,8 +26,15 @@ func normalizeDraft(in models.AssessmentDraft) (models.AssessmentDraft, error) {
 	d := in
 	d.Title = strings.TrimSpace(d.Title)
 	d.Description = strings.TrimSpace(d.Description)
+	d.Kind = strings.TrimSpace(d.Kind)
 	d.Template.FileName = strings.TrimSpace(d.Template.FileName)
 
+	if d.Kind == "" {
+		d.Kind = models.KindLeetcode
+	}
+	if !models.ValidAssessmentKind(d.Kind) {
+		return d, unprocessable("kind must be one of: leetcode, unbound")
+	}
 	if d.Title == "" {
 		return d, unprocessable("title is required")
 	}
@@ -40,7 +47,14 @@ func normalizeDraft(in models.AssessmentDraft) (models.AssessmentDraft, error) {
 	if d.TimeLimitMinutes <= 0 {
 		return d, unprocessable("timeLimitMinutes must be greater than zero")
 	}
-	if d.Template.FileName == "" {
+	if d.Kind == models.KindUnbound {
+		if len(d.Chapters) > 0 || len(d.Tests) > 0 {
+			return d, unprocessable("unbound tasks have no chapters or hidden tests")
+		}
+		if d.Template.FileName == "" {
+			d.Template = models.CodeFile{FileName: "deploy/index.html"}
+		}
+	} else if d.Template.FileName == "" {
 		return d, unprocessable("template.fileName is required")
 	}
 
@@ -131,6 +145,7 @@ type AssessmentListOutput struct {
 
 // ListAssessmentsInput is the request of GET /api/v1/assessments.
 type ListAssessmentsInput struct {
+	Kind       string `query:"kind" doc:"Filter by assessment kind: leetcode or unbound"`
 	Difficulty string `query:"difficulty" doc:"Filter by difficulty rating"`
 	Tag        string `query:"tag" doc:"Filter by tag name (case-insensitive)"`
 	Q          string `query:"q" doc:"Search term matched against title and description"`
@@ -206,6 +221,12 @@ func (h *Handlers) registerAssessments(api huma.API) {
 			Author: strings.TrimSpace(input.Author),
 			Offset: input.Offset,
 			Limit:  limit,
+		}
+		if input.Kind != "" {
+			if !models.ValidAssessmentKind(input.Kind) {
+				return nil, unprocessable("kind must be one of: leetcode, unbound")
+			}
+			filter.Kind = input.Kind
 		}
 		if input.Difficulty != "" {
 			d, ok := models.ParseDifficulty(strings.TrimSpace(input.Difficulty))

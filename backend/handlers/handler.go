@@ -19,8 +19,10 @@ import (
 
 	"backend/assessment"
 	"backend/auth"
+	"backend/collab"
 	"backend/config"
 	"backend/database"
+	"backend/deployments"
 	"backend/mailer"
 	"backend/middleware"
 	"backend/models"
@@ -46,6 +48,11 @@ type Handlers struct {
 
 	// sessions runs the sandboxed environments candidates solve in.
 	sessions *sessions.Manager
+
+	// deployments serves the static apps of event workspaces under
+	// /deploy/<id>/, and collab holds their live browser documents.
+	deployments *deployments.Manager
+	collab      *collab.Manager
 }
 
 // New builds the handler bundle.
@@ -68,16 +75,25 @@ func New(db *sqlx.DB, cfg *config.Config, mail mailer.Mailer,
 		Timeout: cfg.Validation.GenerateTimeout,
 	}
 
-	return &Handlers{
+	return newHandlers(db, cfg, mail, tokens, google, gen, buf, solveSessions)
+}
+
+func newHandlers(db *sqlx.DB, cfg *config.Config, mail mailer.Mailer,
+	tokens *auth.Auth, google *auth.GoogleClient, gen assessment.Generator,
+	secret []byte, solveSessions *sessions.Manager) *Handlers {
+	h := &Handlers{
 		db:         db,
 		cfg:        cfg,
 		mail:       mail,
 		tokens:     tokens,
 		google:     google,
 		generator:  gen,
-		pushSecret: hex.EncodeToString(buf),
+		pushSecret: hex.EncodeToString(secret),
 		sessions:   solveSessions,
 	}
+	h.deployments = deployments.NewManager(cfg.DeploymentsDir)
+	h.collab = collab.NewManager()
+	return h
 }
 
 // Register mounts every huma operation on the API.
@@ -92,6 +108,7 @@ func (h *Handlers) Register(api huma.API) {
 	h.registerAssessmentChapters(api)
 	h.registerAssessmentTests(api)
 	h.registerAssessmentSessions(api)
+	h.registerEvents(api)
 	h.registerTags(api)
 	h.registerSchedule(api)
 }

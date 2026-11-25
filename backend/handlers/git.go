@@ -131,6 +131,21 @@ func (h *Handlers) gitInfoRefs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if strings.HasPrefix(strings.TrimSuffix(repoID, ".git"), "events/") {
+		attempt, err := database.GetAttemptByRepoPath(r.Context(), h.db, repoID)
+		if err != nil {
+			if errors.Is(err, database.ErrNotFound) {
+				writeAttemptRepoFailure(w, errNoAttemptRepo)
+			} else {
+				writeAttemptRepoFailure(w, err)
+			}
+			return
+		}
+		if err := h.authorizeAttemptRepo(r.Context(), u, attempt, service); err != nil {
+			writeAttemptRepoFailure(w, err)
+			return
+		}
+	}
 	if assessmentID, solverID, ok := parseSolutionRepoID(repoID); ok {
 		if err := h.authorizeSolutionRepo(r.Context(), u, assessmentID, solverID, service); err != nil {
 			writeSolutionRepoFailure(w, err)
@@ -188,6 +203,21 @@ func (h *Handlers) gitRPC(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if strings.HasPrefix(strings.TrimSuffix(repoID, ".git"), "events/") {
+		attempt, err := database.GetAttemptByRepoPath(r.Context(), h.db, repoID)
+		if err != nil {
+			if errors.Is(err, database.ErrNotFound) {
+				writeAttemptRepoFailure(w, errNoAttemptRepo)
+			} else {
+				writeAttemptRepoFailure(w, err)
+			}
+			return
+		}
+		if err := h.authorizeAttemptRepo(r.Context(), u, attempt, service); err != nil {
+			writeAttemptRepoFailure(w, err)
+			return
+		}
+	}
 	if assessmentID, solverID, ok := parseSolutionRepoID(repoID); ok {
 		if err := h.authorizeSolutionRepo(r.Context(), u, assessmentID, solverID, service); err != nil {
 			writeSolutionRepoFailure(w, err)
@@ -239,6 +269,7 @@ func (h *Handlers) gitRPC(w http.ResponseWriter, r *http.Request) {
 	if service == gitReceivePack {
 		gitAlignHead(dir)
 		go h.syncAssessmentFromRepo(context.Background(), repoID)
+		go h.syncAttemptFromPush(context.Background(), repoID)
 	}
 }
 
@@ -266,6 +297,11 @@ func (h *Handlers) gitRepoDir(repoID string) (string, error) {
 	}
 
 	if _, ok := parseAssessmentRepoID(id); ok {
+		if err := ensurePushHook(dir); err != nil {
+			return "", err
+		}
+	}
+	if strings.HasPrefix(id, "events/") {
 		if err := ensurePushHook(dir); err != nil {
 			return "", err
 		}
@@ -299,6 +335,82 @@ func parseAssessmentRepoID(repoID string) (int64, bool) {
 		return 0, false
 	}
 	return parsePositiveID(rest)
+}
+
+// errNoAttemptRepo is the sentinel for an event repository with no attempt
+// row behind it.
+var errNoAttemptRepo = errors.New("no attempt backs this repository")
+
+// errEventReadOnly is returned when a push arrives after the event ended.
+var errEventReadOnly = errors.New("the event has ended; the workspace is read-only")
+
+// authorizeAttemptRepo allows attempt members to read and push while the event
+// is live. The event host and task author can read after the event ends, but
+// only attempt members (and admins) may push.
+func (h *Handlers) authorizeAttemptRepo(ctx context.Context, u models.User, attempt database.AttemptRow, service string) error {
+	if u.Role == models.RoleAdmin {
+		return nil
+	}
+	role, err := database.GetAttemptMemberRole(ctx, h.db, attempt.ID, u.ID)
+	if err != nil {
+		return fmt.Errorf("attempt membership lookup: %w", err)
+	}
+	if role != "" {
+		if service == gitReceivePack && attempt.EventStatus != string(models.EventStatusLive) {
+			return errEventReadOnly
+		}
+		return nil
+	}
+
+	eventRole, err := database.GetEventMemberRole(ctx, h.db, attempt.EventID, u.ID)
+	if err != nil {
+		return fmt.Errorf("event membership lookup: %w", err)
+	}
+	if eventRole == models.EventRoleHost {
+		if service == gitReceivePack {
+			return errAssessmentRepoForbidden
+		}
+		return nil
+	}
+	if service == gitUploadPack && attempt.EventStatus == string(models.EventStatusEnded) {
+		authorID, err := database.GetAssessmentAuthorID(ctx, h.db, attempt.AssessmentID)
+		if err == nil && authorID != nil && *authorID == u.ID {
+			return nil
+		}
+	}
+	return errAssessmentRepoForbidden
+}
+
+func writeAttemptRepoFailure(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, errNoAttemptRepo):
+		writeProblem(w, http.StatusNotFound, "no attempt backs this repository")
+	case errors.Is(err, errEventReadOnly):
+		writeProblem(w, http.StatusForbidden, "the event has ended; the workspace is read-only")
+	case errors.Is(err, errAssessmentRepoForbidden):
+		writeProblem(w, http.StatusForbidden, "you do not have access to this attempt")
+	default:
+		log.Printf("attempt repository authorization: %v", err)
+		writeProblem(w, http.StatusInternalServerError, "git service unavailable")
+	}
+}
+
+// syncAttemptFromPush replaces the live editor state with the pushed commit and
+// redeploys. It runs detached from the git request, so failures are logged.
+func (h *Handlers) syncAttemptFromPush(ctx context.Context, repoID string) {
+	ctx, cancel := context.WithTimeout(ctx, assessmentSyncTimeout)
+	defer cancel()
+	attempt, err := database.GetAttemptByRepoPath(ctx, h.db, repoID)
+	if err != nil {
+		if !errors.Is(err, database.ErrNotFound) {
+			log.Printf("attempt push %s: lookup: %v", repoID, err)
+		}
+		return
+	}
+	h.reloadAttemptRoom(ctx, attempt)
+	if err := h.deployAttempt(ctx, attempt); err != nil {
+		log.Printf("attempt push %s: deploy: %v", repoID, err)
+	}
 }
 
 // parseSolutionRepoID recognises the repository name that holds one user's

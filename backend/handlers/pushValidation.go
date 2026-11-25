@@ -16,6 +16,7 @@ import (
 
 	"backend/assessment"
 	"backend/database"
+	"backend/models"
 	"backend/repos"
 )
 
@@ -67,24 +68,42 @@ func (h *Handlers) pushValidation(w http.ResponseWriter, r *http.Request) {
 		writeText(w, http.StatusOK, "")
 		return
 	}
-	id, ok := parseAssessmentRepoID(repository)
-	if !ok {
-		writeText(w, http.StatusOK, "")
-		return
-	}
-
 	if newSHA == zeroSHA {
 		rejectPush(w, repository, newSHA, "main cannot be deleted", "main cannot be deleted")
 		return
 	}
 
-	if _, err := database.GetAssessmentAuthorID(r.Context(), h.db, id); err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			rejectPush(w, repository, newSHA, "no assessment backs this repository", "no assessment backs this repository")
+	ctx := r.Context()
+	kind := ""
+	label := ""
+	if strings.HasPrefix(strings.TrimSuffix(repository, ".git"), "events/") {
+		attempt, err := database.GetAttemptByRepoPath(ctx, h.db, repository)
+		if err != nil {
+			if errors.Is(err, database.ErrNotFound) {
+				rejectPush(w, repository, newSHA, "no attempt backs this repository", "no attempt backs this repository")
+				return
+			}
+			log.Printf("push validation: attempt lookup for %s: %v", repository, err)
+			rejectPush(w, repository, newSHA, "could not verify the workspace", "could not verify the workspace")
 			return
 		}
-		log.Printf("push validation: assessment lookup for %s: %v", repository, err)
-		rejectPush(w, repository, newSHA, "could not verify that main only moves forward", "could not verify that main only moves forward")
+		kind = models.KindUnbound
+		label = fmt.Sprintf("attempt %d", attempt.ID)
+	} else if id, ok := parseAssessmentRepoID(repository); ok {
+		k, err := database.GetAssessmentKind(ctx, h.db, id)
+		if err != nil {
+			if errors.Is(err, database.ErrNotFound) {
+				rejectPush(w, repository, newSHA, "no assessment backs this repository", "no assessment backs this repository")
+				return
+			}
+			log.Printf("push validation: assessment lookup for %s: %v", repository, err)
+			rejectPush(w, repository, newSHA, "could not verify that main only moves forward", "could not verify that main only moves forward")
+			return
+		}
+		kind = k
+		label = fmt.Sprintf("assessment %d", id)
+	} else {
+		writeText(w, http.StatusOK, "")
 		return
 	}
 
@@ -118,7 +137,6 @@ func (h *Handlers) pushValidation(w http.ResponseWriter, r *http.Request) {
 	}
 	defer os.RemoveAll(tmp)
 
-	ctx := r.Context()
 	if err := assessment.Materialize(ctx, dir, newSHA, quarantine, tmp); err != nil {
 		log.Printf("push validation: materialize %s %s: %v", repository, newSHA, err)
 		body := "could not read the pushed snapshot: " + err.Error()
@@ -126,7 +144,13 @@ func (h *Handlers) pushValidation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, violations := assessment.Load(tmp)
+	var content assessment.Content
+	var violations []string
+	if kind == models.KindUnbound {
+		content, violations = assessment.LoadUnbound(tmp)
+	} else {
+		content, violations = assessment.Load(tmp)
+	}
 	if len(violations) > 0 {
 		var b strings.Builder
 		b.WriteString("push to main was rejected:")
@@ -163,8 +187,8 @@ func (h *Handlers) pushValidation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("push validation accepted assessment %d %s: %d chapters in %s",
-		id, newSHA, len(content.Chapters), time.Since(start).Round(time.Millisecond))
+	log.Printf("push validation accepted %s (%s) %s: %d chapters in %s",
+		label, kind, newSHA, len(content.Chapters), time.Since(start).Round(time.Millisecond))
 	writeText(w, http.StatusOK, "")
 }
 
@@ -276,7 +300,18 @@ func (h *Handlers) syncAssessmentFromRepo(ctx context.Context, repoID string) {
 		log.Printf("assessment sync %s: %v", repoID, err)
 		return
 	}
-	content, violations := assessment.Load(tmp)
+	kind, err := database.GetAssessmentKind(ctx, h.db, id)
+	if err != nil {
+		log.Printf("assessment sync %s: %v", repoID, err)
+		return
+	}
+	var content assessment.Content
+	var violations []string
+	if kind == models.KindUnbound {
+		content, violations = assessment.LoadUnbound(tmp)
+	} else {
+		content, violations = assessment.Load(tmp)
+	}
 	if len(violations) > 0 {
 		log.Printf("assessment sync %s: main violates the layout, not syncing: %s", repoID, strings.Join(violations, "; "))
 		return

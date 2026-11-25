@@ -22,6 +22,7 @@ import (
 type Content struct {
 	Kind        string
 	Description string
+	DeployDir   string // root-relative slash path of the static app, unbound tasks only
 	Chapters    []Chapter
 }
 
@@ -40,8 +41,12 @@ type Chapter struct {
 	Specs  []string
 }
 
-// kindLeetcode is the only assessment kind the repository format defines.
-const kindLeetcode = "leetcode"
+// kindLeetcode is a coding challenge exercised by UFT checks. kindUnbound is
+// a web app whose deploy/ directory is published as a live deployment.
+const (
+	kindLeetcode = "leetcode"
+	kindUnbound  = "unbound"
+)
 
 var (
 	indexPattern = regexp.MustCompile(`^[1-9][0-9]*$`)
@@ -78,6 +83,13 @@ func Load(root string) (Content, []string) {
 		} else {
 			content.Kind = kind
 		}
+	}
+
+	// Unbound tasks describe a web app instead of chapters, so the chapter
+	// rules below do not apply to them.
+	if content.Kind == kindUnbound {
+		loadUnbound(root, &content, add)
+		return content, violations
 	}
 
 	// Rules 2 and 3: the root Dockerfile and README.
@@ -132,6 +144,96 @@ func Load(root string) (Content, []string) {
 	sort.Slice(chapters, func(i, j int) bool { return chapters[i].Index < chapters[j].Index })
 	content.Chapters = chapters
 	return content, violations
+}
+
+// LoadUnbound validates a tree as an unbound task. Event workspace
+// repositories are always unbound, so they are validated with this even when
+// they carry no assessment.json.
+func LoadUnbound(root string) (Content, []string) {
+	root = filepath.Clean(root)
+	content := Content{Kind: kindUnbound}
+	var violations []string
+	add := func(format string, args ...any) {
+		violations = append(violations, fmt.Sprintf(format, args...))
+	}
+
+	if data, ok := readOptionalFileAt(filepath.Join(root, "assessment.json"), "assessment.json", add); ok {
+		kind, err := parseKind(data)
+		switch {
+		case err != nil:
+			add("assessment.json: %v", err)
+		case kind != kindUnbound:
+			add("assessment.json: kind must be %q for an unbound task, got %q", kindUnbound, kind)
+		}
+	}
+	loadUnbound(root, &content, add)
+	return content, violations
+}
+
+// loadUnbound reads the optional README and the deploy/ app of an unbound
+// task. The deployment is static: deploy/index.html is its entry point and
+// every other file is served next to it.
+func loadUnbound(root string, content *Content, add func(string, ...any)) {
+	if data, ok := readOptionalFileAt(filepath.Join(root, "README.md"), "README.md", add); ok {
+		if strings.TrimSpace(data) == "" {
+			add("README.md: empty")
+		} else {
+			content.Description = data
+		}
+	}
+
+	dir := filepath.Join(root, "deploy")
+	info, err := os.Lstat(dir)
+	switch {
+	case os.IsNotExist(err):
+		add("deploy: missing")
+		return
+	case err != nil:
+		add("deploy: %v", err)
+		return
+	case !info.IsDir():
+		add("deploy: not a directory")
+		return
+	}
+	if info, err := os.Lstat(filepath.Join(dir, "index.html")); err != nil {
+		add("deploy/index.html: missing")
+	} else if !info.Mode().IsRegular() {
+		add("deploy/index.html: not a regular file")
+	}
+
+	files := 0
+	err = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if p == dir {
+			return nil
+		}
+		rel, relErr := filepath.Rel(root, p)
+		if relErr != nil {
+			return relErr
+		}
+		loc := filepath.ToSlash(rel)
+		if d.Type()&fs.ModeSymlink != 0 {
+			add("%s: symlinks are not allowed in a deployment", loc)
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !d.Type().IsRegular() {
+			add("%s: not a regular file", loc)
+			return nil
+		}
+		files++
+		return nil
+	})
+	if err != nil {
+		add("deploy: %v", err)
+	} else if files == 0 {
+		add("deploy: no files")
+	}
+	content.DeployDir = "deploy"
 }
 
 // readChapterEntries checks the chapters directory and returns the names of its
@@ -275,7 +377,7 @@ func parseKind(data string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unknown kind %v", raw)
 	}
-	if kind != kindLeetcode {
+	if kind != kindLeetcode && kind != kindUnbound {
 		return "", fmt.Errorf("unknown kind %q", kind)
 	}
 	return kind, nil

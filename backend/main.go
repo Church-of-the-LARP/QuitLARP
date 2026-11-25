@@ -86,6 +86,11 @@ func main() {
 	// Callback posted by the git update hook during a push: an internal
 	// endpoint, not part of the public API.
 	root.Handle("POST /internal/push-validation", hs.PushValidationHandler())
+	// Event workspaces have a raw server-sent-events stream (huma does not
+	// model streaming) and static deployments served on a fixed prefix.
+	root.Handle("GET /api/v1/events/{id}/attempts/{attemptId}/stream",
+		middleware.Authenticate(tokens, http.HandlerFunc(hs.EventStream)))
+	root.Handle("/deploy/", hs.DeploymentsHandler())
 	// CookieJar buffers huma responses so session cookies can be attached;
 	// Authenticate parses the session token (cookie or Bearer) per request.
 	root.Handle("/", middleware.CookieJar(middleware.Authenticate(tokens, apiMux)))

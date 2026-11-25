@@ -148,10 +148,24 @@ type TestDraft struct {
 	File        CodeFile `json:"file" doc:"The hidden testing file written by the author"`
 }
 
+// Assessment kinds. A leetcode task is exercised by hidden UFT checks; an
+// unbound task is a web app with no hidden checks whose deploy/ directory is
+// published at /deploy/<id>/ during and after an event.
+const (
+	KindLeetcode = "leetcode"
+	KindUnbound  = "unbound"
+)
+
+// ValidAssessmentKind reports whether kind is one the platform understands.
+func ValidAssessmentKind(kind string) bool {
+	return kind == KindLeetcode || kind == KindUnbound
+}
+
 // AssessmentDraft is the full payload of POST /assessments. Tag names that
 // do not exist yet are created on the fly; duplicates are ignored.
 type AssessmentDraft struct {
 	Title            string         `json:"title" doc:"Assessment title"`
+	Kind             string         `json:"kind,omitempty" enum:"leetcode,unbound" doc:"Assessment kind; defaults to leetcode"`
 	Description      string         `json:"description" doc:"What the candidate has to build"`
 	Difficulty       Difficulty     `json:"difficulty" enum:"easy,medium,hard" doc:"Difficulty rating"`
 	TimeLimitMinutes int            `json:"timeLimitMinutes" example:"120" doc:"Time limit for the whole assessment, in minutes"`

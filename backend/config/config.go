@@ -45,6 +45,7 @@ type Config struct {
 	FrontendURL    string // where the SPA is served (redirects, email links)
 	Email          EmailConfig
 	GitReposDir    string // where the local git server keeps its bare repositories
+	DeploymentsDir string // where event workspace deployments are published
 	Google         GoogleConfig
 	Admin          AdminConfig
 	Validation     ValidationConfig
@@ -177,6 +178,7 @@ func Load() (*Config, error) {
 	cfg.PublicBaseURL = strings.TrimRight(get("PUBLIC_BASE_URL", "http://localhost:8888"), "/")
 	cfg.FrontendURL = strings.TrimRight(get("FRONTEND_URL", "http://localhost:5173"), "/")
 	cfg.GitReposDir = get("GIT_REPOS_DIR", "data/git")
+	cfg.DeploymentsDir = get("DEPLOYMENTS_DIR", "data/deployments")
 
 	cfg.Validation = ValidationConfig{
 		GenerateCommand: generateCommand(),

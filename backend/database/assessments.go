@@ -92,6 +92,7 @@ func (r assessmentRow) assessment() models.Assessment {
 // Tag/Q/Author mean "no filter on that axis".
 type AssessmentFilter struct {
 	Difficulty *models.Difficulty
+	Kind       string
 	Tag        string
 	Q          string
 	Author     string
@@ -108,6 +109,10 @@ func assessmentWhere(f AssessmentFilter) (string, []any) {
 	if f.Difficulty != nil {
 		args = append(args, string(*f.Difficulty))
 		conds = append(conds, fmt.Sprintf("a.difficulty = $%d", len(args)))
+	}
+	if f.Kind != "" {
+		args = append(args, f.Kind)
+		conds = append(conds, fmt.Sprintf("a.kind = $%d", len(args)))
 	}
 	if f.Tag != "" {
 		args = append(args, f.Tag)
@@ -240,6 +245,15 @@ func GetAssessmentDetail(ctx context.Context, db *sqlx.DB, id int64) (models.Ass
 	return got, nil
 }
 
+// GetAssessmentKind returns the kind of an assessment, or ErrNotFound.
+func GetAssessmentKind(ctx context.Context, db *sqlx.DB, id int64) (string, error) {
+	var kind string
+	if err := db.GetContext(ctx, &kind, "SELECT kind FROM assessments WHERE id = $1", id); err != nil {
+		return "", mapNotFound(err)
+	}
+	return kind, nil
+}
+
 // GetAssessmentAuthorID returns the author id of an assessment (nil once the
 // author account has been deleted), or ErrNotFound.
 func GetAssessmentAuthorID(ctx context.Context, db *sqlx.DB, id int64) (*int64, error) {
@@ -264,11 +278,11 @@ func CreateAssessment(ctx context.Context, db *sqlx.DB, authorID int64, draft mo
 	var id int64
 	err = tx.GetContext(ctx, &id, `
 		INSERT INTO assessments (title, description, difficulty, time_limit_minutes,
-		                         template_file_name, template_file_content, author_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		                         template_file_name, template_file_content, author_id, kind)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id`,
 		draft.Title, draft.Description, draft.Difficulty, draft.TimeLimitMinutes,
-		draft.Template.FileName, draft.Template.Content, authorID)
+		draft.Template.FileName, draft.Template.Content, authorID, draft.Kind)
 	if err != nil {
 		return models.Assessment{}, err
 	}
@@ -412,7 +426,8 @@ func SyncAssessmentContent(ctx context.Context, db *sqlx.DB, id int64, content a
 
 	res, err := tx.ExecContext(ctx, `
 		UPDATE assessments
-		SET description = $2, kind = $3, main_commit = $4, synced_at = NOW()
+		SET description = CASE WHEN $2 = '' THEN description ELSE $2 END,
+		    kind = $3, main_commit = $4, synced_at = NOW()
 		WHERE id = $1`, id, content.Description, content.Kind, mainCommit)
 	if err != nil {
 		return fmt.Errorf("sync assessment %d: %w", id, err)

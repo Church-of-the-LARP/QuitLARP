@@ -138,3 +138,63 @@ func TestCommitFilesRejectsBadPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestCommitFilePreservesOtherFiles(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "workspace.git")
+	if _, err := CommitFiles(dir, map[string][]byte{
+		"deploy/index.html": []byte("<h1>one</h1>"),
+		"README.md":         []byte("readme"),
+	}, "seed", testAuthor()); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	sha, err := CommitFile(dir, "deploy/index.html", []byte("<h1>two</h1>"), "edit", testAuthor())
+	if err != nil {
+		t.Fatalf("CommitFile: %v", err)
+	}
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, err := repo.CommitObject(plumbing.NewHash(sha))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := readBlob(t, repo, commit, "deploy/index.html"); got != "<h1>two</h1>" {
+		t.Fatalf("edited blob = %q", got)
+	}
+	if got := readBlob(t, repo, commit, "README.md"); got != "readme" {
+		t.Fatalf("preserved blob = %q", got)
+	}
+}
+
+func TestDeleteFileRemovesOnlyThatFile(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "workspace.git")
+	if _, err := CommitFiles(dir, map[string][]byte{
+		"deploy/index.html": []byte("<h1>one</h1>"),
+		"deploy/app.js":     []byte("app"),
+	}, "seed", testAuthor()); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	sha, err := DeleteFile(dir, "deploy/app.js", "delete", testAuthor())
+	if err != nil {
+		t.Fatalf("DeleteFile: %v", err)
+	}
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, err := repo.CommitObject(plumbing.NewHash(sha))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := commit.Tree(); err != nil {
+		t.Fatal(err)
+	}
+	tree, _ := commit.Tree()
+	if _, err := tree.FindEntry("deploy/app.js"); err == nil {
+		t.Fatal("deleted file is still in the tree")
+	}
+	if got := readBlob(t, repo, commit, "deploy/index.html"); got != "<h1>one</h1>" {
+		t.Fatalf("preserved blob = %q", got)
+	}
+}
