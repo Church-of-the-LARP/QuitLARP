@@ -158,6 +158,9 @@ func (h *Handlers) registerAssessmentSessions(api huma.API) {
 		if err != nil {
 			return nil, sessionError(err)
 		}
+		if err := database.SaveTestRun(ctx, h.db, u.ID, input.ID, report.Results, report.AllPassed); err != nil {
+			log.Printf("save test run for assessment %d user %d: %v", input.ID, u.ID, err)
+		}
 		resp := &SolveTestsOutput{}
 		resp.Body.Results = report.Results
 		resp.Body.Raw = report.Raw
