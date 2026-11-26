@@ -188,6 +188,7 @@ func (h *Handlers) registerAssessmentSessions(api huma.API) {
 		if err != nil {
 			return nil, sessionError(err)
 		}
+		h.notifyAssessmentResult(ctx, u, input.ID)
 		resp := &SolveSolutionOutput{}
 		resp.Body.Solution = h.solutionBody(solution)
 		return resp, nil

@@ -293,7 +293,27 @@ func (h *Handlers) registerEvents(api huma.API) {
 			log.Printf("create event: %v", err)
 			return nil, unprocessable(err.Error())
 		}
-		return h.eventOutput(ctx, id, u)
+		out, err := h.eventOutput(ctx, id, u)
+		if err != nil {
+			return nil, err
+		}
+		event := out.Body.Event
+		if monitored {
+			h.notifyUser(ctx, u.ID, "Interview created",
+				fmt.Sprintf("You created %q with %d task(s) and %d candidate(s).",
+					event.Title, len(event.Tasks), len(event.Members)-1))
+		}
+		inviteTitle := "Collaboration invitation"
+		if monitored {
+			inviteTitle = "Interview invitation"
+		}
+		for _, member := range event.Members {
+			if member.Role == models.EventRoleMember && member.UserID != u.ID {
+				h.notifyUser(ctx, member.UserID, inviteTitle,
+					fmt.Sprintf("%s invited you to %q.", u.Username, event.Title))
+			}
+		}
+		return out, nil
 	})
 
 	huma.Register(api, huma.Operation{
@@ -569,8 +589,26 @@ func (h *Handlers) registerEvents(api huma.API) {
 			}
 			return nil, h.eventError(err)
 		}
-		if err := database.AddEventMember(ctx, h.db, input.ID, member.ID); err != nil {
+		row, err := database.GetEventRow(ctx, h.db, input.ID)
+		if err != nil {
 			return nil, h.eventError(err)
+		}
+		existing, err := database.GetEventMemberRole(ctx, h.db, input.ID, member.ID)
+		if err != nil {
+			return nil, h.eventError(err)
+		}
+		if existing == "" {
+			if err := database.AddEventMember(ctx, h.db, input.ID, member.ID); err != nil {
+				return nil, h.eventError(err)
+			}
+			if member.ID != u.ID {
+				title := "Collaboration invitation"
+				if row.Monitored {
+					title = "Interview invitation"
+				}
+				h.notifyUser(ctx, member.ID, title,
+					fmt.Sprintf("%s invited you to %q.", u.Username, row.Title))
+			}
 		}
 		return h.eventOutput(ctx, input.ID, u)
 	})
@@ -828,6 +866,17 @@ func (h *Handlers) registerEvents(api huma.API) {
 		if err := h.deployAttempt(ctx, access.attempt); err != nil {
 			log.Printf("deploy attempt %d after commit: %v", access.attempt.ID, err)
 		}
+		if row, err := database.GetEventRow(ctx, h.db, input.ID); err == nil &&
+			row.Monitored && row.Status != models.EventStatusDraft {
+			taskTitle, titleErr := database.GetEventTaskTitle(ctx, h.db, input.ID, access.attempt.EventTaskID)
+			if titleErr != nil {
+				log.Printf("commit notification task title: %v", titleErr)
+				taskTitle = "the task"
+			}
+			h.notifyEventHosts(ctx, input.ID, access.user.ID, "New interview result",
+				fmt.Sprintf("%s submitted %q for %q in %q.",
+					access.user.Username, access.attempt.Name, taskTitle, row.Title))
+		}
 		return h.attemptOutput(ctx, input.ID, access.attempt.ID, access.user, access.isHost)
 	})
 
@@ -911,11 +960,27 @@ func (h *Handlers) registerEvents(api huma.API) {
 			}
 			return nil, h.eventError(err)
 		}
-		if err := database.AddEventMember(ctx, h.db, input.ID, member.ID); err != nil {
+		existing, err := database.GetAttemptMemberRole(ctx, h.db, input.AttemptID, member.ID)
+		if err != nil {
 			return nil, h.eventError(err)
 		}
-		if err := database.AddAttemptMember(ctx, h.db, input.AttemptID, member.ID); err != nil {
-			return nil, h.eventError(err)
+		if existing == "" {
+			if err := database.AddEventMember(ctx, h.db, input.ID, member.ID); err != nil {
+				return nil, h.eventError(err)
+			}
+			if err := database.AddAttemptMember(ctx, h.db, input.AttemptID, member.ID); err != nil {
+				return nil, h.eventError(err)
+			}
+			if member.ID != access.user.ID {
+				taskTitle, titleErr := database.GetEventTaskTitle(ctx, h.db, input.ID, access.attempt.EventTaskID)
+				if titleErr != nil {
+					log.Printf("attempt invite task title: %v", titleErr)
+					taskTitle = "the task"
+				}
+				h.notifyUser(ctx, member.ID, "Collaboration invitation",
+					fmt.Sprintf("%s invited you to collaborate on %q for %q in %q.",
+						access.user.Username, access.attempt.Name, taskTitle, row.Title))
+			}
 		}
 		return h.attemptOutput(ctx, input.ID, input.AttemptID, access.user, access.isHost)
 	})
