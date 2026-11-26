@@ -1,12 +1,26 @@
+# QuitLARP compose stack.
+#
+# Local:   copy .env.example to .env, fill it in, then `docker compose up --build`.
+# Launchpad: point the compose project at this file. Launchpad scans the
+# `${...}` placeholders below and asks for them once per project. It also owns
+# the external `web` network, Traefik labels and the Cloudflare tunnel, so this
+# stack does not run cloudflared or publish its own ingress.
+#
+# Two services are meant to be published through Launchpad/Traefik:
+#   frontend -> container port 5173
+#   backend  -> container port 8888 (set VITE_API_URL to its public URL)
+# The database, Mailpit and the sandbox daemon stay internal.
+name: quitlarp
+
 services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-      POSTGRES_DB: app
+      POSTGRES_USER: "${POSTGRES_USER:-app}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB:-app}"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
       interval: 2s
       timeout: 2s
       retries: 15
@@ -20,7 +34,7 @@ services:
     image: axllent/mailpit:v1.31.1
     ports:
       - "${MAILPIT_UI_PORT:-8025}:8025" # web UI
-      - "1025:1025"                     # SMTP (for a backend run on the host)
+      - "${MAILPIT_SMTP_PORT:-1025}:1025" # SMTP (for a backend run on the host)
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8025/livez"]
       interval: 5s
@@ -48,21 +62,65 @@ services:
     build:
       context: ./backend
       # The utf CLI for the push validation gate is built from the universal
-      # testing framework checkout; point UTF_SRC elsewhere to use another one.
+      # testing framework checkout. The default is a Git context so a fresh
+      # clone (Launchpad included) builds without a sibling checkout; a local
+      # .env can set UTF_SRC=../UniversalTestingFramework instead.
       additional_contexts:
-        utf-src: ${UTF_SRC:-../UniversalTestingFramework}
+        utf-src: "${UTF_SRC:-https://github.com/Church-of-the-LARP/UniversalTestingFramework.git#main}"
     environment:
-      DATABASE_URL: postgres://app:app@db:5432/app?sslmode=disable
-      # The email transport is selected by ENV/EMAIL_PROVIDER in
-      # backend/.env; only the in-network Mailpit address is pinned here.
-      MAILPIT_SMTP_ADDR: mailpit:1025
+      # Database. Keep the password URL-safe because it goes into the DSN.
+      DATABASE_URL: "postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}?sslmode=disable"
+
+      # Core service settings.
+      ENV: "${ENV}"
+      PORT: "8888"
+      JWT_SECRET: "${JWT_SECRET}"
+      SESSION_TTL_HOURS: "${SESSION_TTL_HOURS:-24}"
+      ACTION_TOKEN_TTL_HOURS: "${ACTION_TOKEN_TTL_HOURS:-24}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-}"
+      CORS_ORIGINS: "${CORS_ORIGINS}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL}"
+      FRONTEND_URL: "${FRONTEND_URL}"
+
+      # Bootstrap admin account.
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@example.com}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+
+      # Google OAuth (optional).
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      GOOGLE_REDIRECT_URL: "${GOOGLE_REDIRECT_URL:-}"
+
+      # Email delivery. Mailpit is the dev default; set resend in production.
+      EMAIL_PROVIDER: "${EMAIL_PROVIDER:-mailpit}"
+      EMAIL_FROM: "${EMAIL_FROM:-QuitLARP <no-reply@example.com>}"
+      MAILPIT_SMTP_ADDR: "${MAILPIT_SMTP_ADDR:-mailpit:1025}"
+      MAILPIT_UI_URL: "${MAILPIT_UI_URL:-http://localhost:8025}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+
+      # Local git server and static deployments.
+      GIT_REPOS_DIR: "${GIT_REPOS_DIR:-data/git}"
+      DEPLOYMENTS_DIR: "${DEPLOYMENTS_DIR:-data/deployments}"
+
+      # Push validation. An explicitly empty value disables the generation gate.
+      VALIDATION_GENERATE_COMMAND: "${VALIDATION_GENERATE_COMMAND-utf gen python}"
+      VALIDATION_GENERATE_TIMEOUT: "${VALIDATION_GENERATE_TIMEOUT:-5m}"
+
+      # Sandboxed assessment runtime.
       DOCKER_HOST: tcp://dind:2375
-      MAILPIT_UI_URL: http://localhost:${MAILPIT_UI_PORT:-8025}
-      # The backend image ships the utf CLI, so the gate invokes it directly
-      # instead of going through dune the way the .env.example default does.
-      VALIDATION_GENERATE_COMMAND: utf gen python
+      ASSESSMENT_SESSION_TTL: "${ASSESSMENT_SESSION_TTL:-2h}"
+      ASSESSMENT_MEMORY_MB: "${ASSESSMENT_MEMORY_MB:-512}"
+      ASSESSMENT_NANO_CPUS: "${ASSESSMENT_NANO_CPUS:-1000000000}"
+      ASSESSMENT_PIDS_LIMIT: "${ASSESSMENT_PIDS_LIMIT:-256}"
+      ASSESSMENT_BUILD_TIMEOUT: "${ASSESSMENT_BUILD_TIMEOUT:-15m}"
+      ASSESSMENT_EXEC_TIMEOUT: "${ASSESSMENT_EXEC_TIMEOUT:-90s}"
+      ASSESSMENT_DATA_DIR: "${ASSESSMENT_DATA_DIR:-data}"
+      ASSESSMENT_UTF_SRC_DIR: "${ASSESSMENT_UTF_SRC_DIR:-/utf-src}"
+      ASSESSMENT_HARNESS_IMAGE: "${ASSESSMENT_HARNESS_IMAGE:-codingtest-harness:latest}"
+      ASSESSMENT_IMAGE_PREFIX: "${ASSESSMENT_IMAGE_PREFIX:-codingtest-assessment}"
     ports:
-      - "8888:8888"
+      - "${BACKEND_PORT:-8888}:8888"
     depends_on:
       db:
         condition: service_healthy
@@ -82,6 +140,10 @@ services:
 
   frontend:
     build: ./frontend
+    environment:
+      # Browser-visible backend origin. Must be the public URL when deployed
+      # behind Traefik/Cloudflare, otherwise the browser calls localhost.
+      VITE_API_URL: "${VITE_API_URL}"
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:

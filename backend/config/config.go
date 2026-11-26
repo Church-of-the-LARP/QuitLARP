@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -140,11 +141,12 @@ type AdminConfig struct {
 	Password string
 }
 
-// Load reads configuration from the environment plus an optional .env file.
+// Load reads configuration from the environment plus the optional root .env
+// file. The file lives at the repository root; when the backend is started from
+// its own directory the parent .env is used so there is only one env file.
 func Load() (*Config, error) {
-	// Missing .env file is fine; other load errors are not.
-	if err := godotenv.Load(".env"); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("load .env: %w", err)
+	if err := loadDotEnv(); err != nil {
+		return nil, err
 	}
 
 	cfg := &Config{}
@@ -153,7 +155,7 @@ func Load() (*Config, error) {
 	cfg.Port = get("PORT", "8888")
 	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	if cfg.DatabaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL is required (see backend/.env.example)")
+		return nil, fmt.Errorf("DATABASE_URL is required (see .env.example at the repository root)")
 	}
 
 	cfg.CORSOrigins = splitList(get("CORS_ORIGINS", "http://localhost:5173"))
@@ -161,7 +163,7 @@ func Load() (*Config, error) {
 
 	cfg.JWTSecret = get("JWT_SECRET", defaultJWTSecret)
 	if cfg.JWTSecret == defaultJWTSecret {
-		log.Printf("WARNING: JWT_SECRET not set in the environment; using an insecure development default. Set it in backend/.env before deploying.")
+		log.Printf("WARNING: JWT_SECRET not set in the environment; using an insecure development default. Set it in the root .env before deploying.")
 	}
 
 	if hours, err := strconv.Atoi(get("SESSION_TTL_HOURS", "24")); err == nil && hours > 0 {
@@ -222,10 +224,24 @@ func Load() (*Config, error) {
 		Password: getWithLegacy("ADMIN_PASSWORD", "SUPERADMIN_PASSWORD", defaultAdminPassword),
 	}
 	if cfg.Admin.Password == defaultAdminPassword {
-		log.Printf("WARNING: ADMIN_PASSWORD not set in the environment; using an insecure development default. Set it in backend/.env before deploying.")
+		log.Printf("WARNING: ADMIN_PASSWORD not set in the environment; using an insecure development default. Set it in the root .env before deploying.")
 	}
 
 	return cfg, nil
+}
+
+// loadDotEnv loads the repository-root .env whether the process starts in the
+// repository root or in backend/. A missing file is fine; a malformed one is
+// reported. There is deliberately no backend/.env lookup.
+func loadDotEnv() error {
+	envPath := ".env"
+	if wd, err := os.Getwd(); err == nil && filepath.Base(wd) == "backend" {
+		envPath = "../.env"
+	}
+	if err := godotenv.Load(envPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("load %s: %w", envPath, err)
+	}
+	return nil
 }
 
 func getWithLegacy(key, legacyKey, fallback string) string {
