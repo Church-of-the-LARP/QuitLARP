@@ -789,7 +789,7 @@ export default function EventRoom() {
                 </section>
               )}
 
-              {activeAttempt ? (
+              {activeAttempt && (
                 <div className="grid min-h-[70vh] gap-2 rounded-xl bg-panel p-4 xl:grid-cols-[240px_minmax(0,1fr)]">
                   <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl bg-surface p-3">
                     <div className="mb-2 flex items-center justify-between gap-2 px-1">
@@ -1046,12 +1046,6 @@ export default function EventRoom() {
                       {repoUrl}
                     </button>
                   )}
-                </div>
-              ) : (
-                <div className="rounded-xl bg-surface p-6 text-muted">
-                  {event.status === "live"
-                    ? "Start your workspace above to open the editor."
-                    : "No workspace is available for this session."}
                 </div>
               )}
             </>
