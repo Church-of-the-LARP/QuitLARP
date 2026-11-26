@@ -1,0 +1,18 @@
+# Local development only. `docker compose` merges this over compose.yaml, so
+# source edits hot-reload and the host's backend/data is used. Launchpad reads
+# compose.yaml alone, so deployments run the images and their named volumes.
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+      - ./backend/data:/app/data
+      - gomod:/go/pkg/mod
+
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - node_modules:/app/node_modules
+
+volumes:
+  gomod:
+  node_modules:
