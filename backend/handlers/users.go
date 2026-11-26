@@ -15,8 +15,16 @@ import (
 // UsersOutput is the response of GET /api/v1/users.
 type UsersOutput struct {
 	Body struct {
-		Users []models.User `json:"users"`
+		Users      []models.User `json:"users"`
+		Total      int64         `json:"total" doc:"Total number of accounts"`
+		Unverified int64         `json:"unverified" doc:"Accounts whose email address is not verified"`
 	}
+}
+
+// ListUsersInput is the request of GET /api/v1/users.
+type ListUsersInput struct {
+	Offset int `query:"offset" example:"0" doc:"Number of results to skip"`
+	Limit  int `query:"limit" example:"50" doc:"Maximum number of results (1-200, default 50)"`
 }
 
 // UserSearchOutput is the response of GET /api/v1/users/search.
@@ -69,18 +77,30 @@ func (h *Handlers) registerUsers(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/users",
 		Summary:     "List users (admin only)",
-		Description: "Requires the caller to hold the admin role.",
-	}, func(ctx context.Context, _ *struct{}) (*UsersOutput, error) {
+		Description: "Requires the caller to hold the admin role. Returns one page ordered by id together with the total and unverified account counts.",
+	}, func(ctx context.Context, input *ListUsersInput) (*UsersOutput, error) {
 		if _, err := h.requireUser(ctx, models.RoleAdmin); err != nil {
 			return nil, err
 		}
-		users, err := database.ListUsers(ctx, h.db)
+		if input.Offset < 0 {
+			return nil, unprocessable("offset must be zero or greater")
+		}
+		limit := input.Limit
+		if limit == 0 {
+			limit = 50
+		}
+		if limit < 1 || limit > 200 {
+			return nil, unprocessable("limit must be between 1 and 200")
+		}
+		users, total, unverified, err := database.ListUsersPage(ctx, h.db, limit, input.Offset)
 		if err != nil {
 			log.Printf("list users: %v", err)
 			return nil, huma.NewError(http.StatusInternalServerError, "could not list users")
 		}
 		resp := &UsersOutput{}
 		resp.Body.Users = users
+		resp.Body.Total = total
+		resp.Body.Unverified = unverified
 		return resp, nil
 	})
 

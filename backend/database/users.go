@@ -66,12 +66,29 @@ func GetUserByUsername(ctx context.Context, db *sqlx.DB, username string) (model
 	return u, nil
 }
 
-// ListUsers returns every user ordered by id.
-func ListUsers(ctx context.Context, db *sqlx.DB) ([]models.User, error) {
+// ListUsersPage returns one page of users ordered by id together with the
+// total account count and how many accounts still need email verification.
+func ListUsersPage(ctx context.Context, db *sqlx.DB, limit, offset int) ([]models.User, int64, int64, error) {
+	var counts struct {
+		Total      int64 `db:"total"`
+		Unverified int64 `db:"unverified"`
+	}
+	if err := db.GetContext(ctx, &counts, `
+		SELECT COUNT(*) AS total,
+		       COUNT(*) FILTER (WHERE NOT email_verified) AS unverified
+		FROM users`); err != nil {
+		return nil, 0, 0, err
+	}
+
 	users := []models.User{}
-	err := db.SelectContext(ctx, &users,
-		"SELECT "+models.UserColumns+" FROM users ORDER BY id")
-	return users, err
+	err := db.SelectContext(ctx, &users, `
+		SELECT `+models.UserColumns+` FROM users
+		ORDER BY id
+		LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return users, counts.Total, counts.Unverified, nil
 }
 
 // SearchUsernames returns up to limit accounts whose username starts with q,

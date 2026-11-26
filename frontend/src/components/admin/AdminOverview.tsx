@@ -1,8 +1,8 @@
 import type { AdminLiveSession, AdminSubmission, AdminTab } from '../../types/admin.ts';
-import type { User } from '../../types/types.ts';
 
 type Props = {
-  users: User[];
+  userCount: number;
+  unverifiedCount: number;
   assessmentCount: number;
   sessions: AdminLiveSession[];
   submissions: AdminSubmission[];
@@ -46,7 +46,8 @@ function CountCard({
 }
 
 export default function AdminOverview({
-  users,
+  userCount,
+  unverifiedCount,
   assessmentCount,
   sessions,
   submissions,
@@ -58,7 +59,6 @@ export default function AdminOverview({
   const latestSessions = [...sessions]
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, 4);
-  const unverifiedUsers = users.filter((user) => !user.emailVerified).length;
 
   return (
     <section className="space-y-6">
@@ -72,8 +72,8 @@ export default function AdminOverview({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <CountCard
           label="Total users"
-          value={users.length}
-          detail={`${unverifiedUsers} need email verification`}
+          value={userCount}
+          detail={`${unverifiedCount} need email verification`}
           tab="users"
           onSelect={onSelect}
         />

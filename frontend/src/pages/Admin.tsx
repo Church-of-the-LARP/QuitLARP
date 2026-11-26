@@ -14,7 +14,6 @@ import type {
   AdminSubmission,
   AdminTab,
 } from '../types/admin.ts';
-import type { User } from '../types/types.ts';
 
 const tabs: { id: AdminTab; label: string }[] = [
   { id: 'overview', label: 'Overview' }, { id: 'users', label: 'Users' },
@@ -42,7 +41,7 @@ export default function Admin() {
   const isModerator = user?.role === 'moderator';
   const [tab, setTab] = useState<AdminTab>('overview');
   const activeTab = isModerator ? 'assessments' : tab;
-  const [users, setUsers] = useState<User[]>([]);
+  const [userStats, setUserStats] = useState({ total: 0, unverified: 0 });
   const [assessments, setAssessments] = useState<AdminAssessment[]>([]);
   const [assessmentCount, setAssessmentCount] = useState(0);
   const [sessions, setSessions] = useState<AdminLiveSession[]>([]);
@@ -51,9 +50,14 @@ export default function Admin() {
   const [busy, setBusy] = useState<number | string | null>(null);
 
   const loadUsers = useCallback(async () => {
-    const res = await client.GET('/api/v1/users');
+    const res = await client.GET('/api/v1/users', {
+      params: { query: { limit: 1, offset: 0 } },
+    });
     if (res.error) throw new Error(getErrorText(res.error, 'Could not load users'));
-    setUsers(res.data?.users ?? []);
+    setUserStats({
+      total: res.data?.total ?? 0,
+      unverified: res.data?.unverified ?? 0,
+    });
   }, []);
   const loadAssessments = useCallback(async () => {
     const pageSize = 100;
@@ -205,7 +209,8 @@ export default function Admin() {
 
       {isAdmin && activeTab === 'overview' && (
         <AdminOverview
-          users={users}
+          userCount={userStats.total}
+          unverifiedCount={userStats.unverified}
           assessmentCount={assessmentCount}
           sessions={sessions}
           submissions={submissions}

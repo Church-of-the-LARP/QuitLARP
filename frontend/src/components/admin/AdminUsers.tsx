@@ -11,6 +11,7 @@ const roleStyles: Record<Role, string> = {
   admin: 'bg-warning/20 text-warning',
 };
 const roles: Role[] = ['user', 'moderator', 'admin'];
+const PAGE_SIZE = 25;
 
 function isRole(value: string): value is Role {
   return value === 'user' || value === 'moderator' || value === 'admin';
@@ -21,13 +22,18 @@ export default function AdminUsers() {
   const isAdmin = user?.role === 'admin';
 
   const [users, setUsers] = useState<User[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [alertMsg, setAlertMsg] = useState<AlertMessage | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
 
   const loadUsers = useCallback(async () => {
-    const res = await client.GET('/api/v1/users');
+    const res = await client.GET('/api/v1/users', {
+      params: { query: { limit: PAGE_SIZE, offset } },
+    });
     if (res.error) {
       setUsers([]);
+      setTotal(0);
       setAlertMsg({
         kind: 'error',
         text: getErrorText(res.error, 'Could not load the user list'),
@@ -37,7 +43,8 @@ export default function AdminUsers() {
 
     setAlertMsg(null);
     setUsers(res.data?.users ?? []);
-  }, []);
+    setTotal(res.data?.total ?? 0);
+  }, [offset]);
 
   useEffect(() => {
     if (isAdmin) void loadUsers();
@@ -74,6 +81,11 @@ export default function AdminUsers() {
 
   if (!user || !isAdmin) return null;
 
+  const page = Math.floor(offset / PAGE_SIZE) + 1;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const first = total === 0 ? 0 : offset + 1;
+  const last = Math.min(offset + users.length, total);
+
   return (
     <section>
       {alertMsg && (
@@ -88,7 +100,7 @@ export default function AdminUsers() {
             Manage accounts and assign user, moderator, or admin roles.
           </p>
         </div>
-        <span className="text-xs text-dim">{users.length} total</span>
+        <span className="text-xs text-dim">{total} total</span>
       </div>
       <ul className="mt-3 rounded-md bg-surface">
         {users.map((target) => (
@@ -155,6 +167,32 @@ export default function AdminUsers() {
           </li>
         )}
       </ul>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
+        <span>
+          {first}–{last} of {total}
+        </span>
+        <span className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+            disabled={offset === 0}
+            className="rounded-md border border-line-hover bg-panel px-3 py-1.5 font-semibold text-muted transition hover:border-dim hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span>
+            Page {page} of {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={() => setOffset(offset + PAGE_SIZE)}
+            disabled={offset + PAGE_SIZE >= total}
+            className="rounded-md border border-line-hover bg-panel px-3 py-1.5 font-semibold text-muted transition hover:border-dim hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </span>
+      </div>
     </section>
   );
 }
