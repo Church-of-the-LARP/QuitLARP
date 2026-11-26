@@ -1,14 +1,22 @@
 # QuitLARP compose stack.
 #
 # Local:   copy .env.example to .env, fill it in, then `docker compose up --build`.
+# Local live reload comes from compose.override.yaml, which `docker compose`
+# merges automatically. Launchpad reads this file alone, so its containers run
+# the code baked into the images instead of bind-mounting panel paths.
 # Launchpad: point the compose project at this file. Launchpad scans the
-# `${...}` placeholders below and asks for them once per project. It also owns
-# the external `web` network, Traefik labels and the Cloudflare tunnel, so this
-# stack does not run cloudflared or publish its own ingress.
+# `${...}` placeholders below and asks for them once per project.
 #
-# Two services are meant to be published through Launchpad/Traefik:
-#   frontend -> container port 5173
-#   backend  -> container port 8888 (set VITE_API_URL to its public URL)
+# The stack runs its own Cloudflare tunnel (`tunnel`), like the other Launchpad
+# apps: create a tunnel in Zero Trust, put its token in TUNNEL_TOKEN, and add
+# two public hostnames on that tunnel pointing at the containers on this
+# network (not at localhost):
+#   app host -> http://frontend:5173
+#   api host -> http://backend:8888
+# Set VITE_API_URL to the API origin, and PUBLIC_BASE_URL, FRONTEND_URL and
+# CORS_ORIGINS to the public origins. If you route through Launchpad's Traefik
+# instead, publish frontend (5173) and backend (8888) in the scan and point the
+# tunnel's hostnames at http://traefik:80.
 # The database, Mailpit and the sandbox daemon stay internal.
 name: quitlarp
 
@@ -132,29 +140,51 @@ services:
       test: ["CMD", "wget", "-qO-", "http://localhost:8888/openapi.json"]
       interval: 5s
       timeout: 3s
-      retries: 12
-      start_period: 10s
+      retries: 24
+      start_period: 30s
     volumes:
-      - ./backend:/app
-      - gomod:/go/pkg/mod
+      # Persist git repos, published deployments and assessment data across
+      # redeploys. Local runs replace this with ./backend/data in the override.
+      - backend-data:/app/data
 
   frontend:
     build: ./frontend
     environment:
-      # Browser-visible backend origin. Must be the public URL when deployed
-      # behind Traefik/Cloudflare, otherwise the browser calls localhost.
+      # Browser-visible backend origin. Must be the public API URL when deployed
+      # behind the tunnel or Traefik, otherwise the browser calls localhost.
       VITE_API_URL: "${VITE_API_URL}"
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
       backend:
         condition: service_healthy
-    volumes:
-      - ./frontend:/app
-      - node_modules:/app/node_modules
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5173/"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 30s
+
+  # Cloudflare tunnel for the public hostnames. Token-mode tunnels are managed
+  # remotely: add the public hostnames in Zero Trust -> Networks -> Tunnels
+  # (app host -> http://frontend:5173, api host -> http://backend:8888).
+  # The `tunnel` profile keeps it out of a plain local `docker compose up`;
+  # Launchpad ignores profiles and starts it with the stack.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      # Required by Launchpad; local runs keep the tunnel profile off.
+      TUNNEL_TOKEN: "${TUNNEL_TOKEN}"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
 
 volumes:
+  backend-data:
   dind-data:
   pgdata:
-  gomod:
-  node_modules:
