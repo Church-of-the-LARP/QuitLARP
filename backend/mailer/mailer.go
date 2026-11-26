@@ -33,7 +33,7 @@ func New(cfg config.EmailConfig) (Mailer, error) {
 		return NewMailpit(cfg.From, cfg.MailpitSMTPAddr, cfg.MailpitUIURL), nil
 	case config.EmailProviderResend:
 		if cfg.ResendAPIKey == "" {
-			return nil, fmt.Errorf("EMAIL_PROVIDER=%s requires RESEND_API_KEY (see backend/.env.example)", config.EmailProviderResend)
+			return nil, fmt.Errorf("EMAIL_PROVIDER=%s requires RESEND_API_KEY (see .env.example at the repository root)", config.EmailProviderResend)
 		}
 		return NewResend(cfg.From, cfg.ResendAPIKey), nil
 	default:

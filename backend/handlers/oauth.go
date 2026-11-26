@@ -25,7 +25,7 @@ import (
 func (h *Handlers) GoogleAuthStart(w http.ResponseWriter, r *http.Request) {
 	if !h.google.Enabled() {
 		writeProblem(w, http.StatusNotImplemented,
-			"Google OAuth is not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (see backend/.env.example)")
+			"Google OAuth is not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (see .env.example at the repository root)")
 		return
 	}
 	state, err := randomHex(16)
@@ -55,7 +55,7 @@ func (h *Handlers) GoogleAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 	if !h.google.Enabled() {
 		writeProblem(w, http.StatusNotImplemented,
-			"Google OAuth is not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (see backend/.env.example)")
+			"Google OAuth is not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (see .env.example at the repository root)")
 		return
 	}
 	if denied := r.URL.Query().Get("error"); denied != "" {
