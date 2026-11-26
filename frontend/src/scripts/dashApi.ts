@@ -72,3 +72,15 @@ export async function getTags(): Promise<TagCount[]> {
 
   return data.tags ?? [];
 }
+
+export type Notification = components["schemas"]["Notification"];
+
+export async function getNotifications(limit = 20): Promise<Notification[]> {
+  const { data, error } = await client.GET("/api/v1/notifications", {
+    params: { query: { limit } },
+  });
+
+  if (error || !data) throw new DashApiError(getErrorText(error));
+
+  return data.notifications ?? [];
+}

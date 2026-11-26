@@ -7,7 +7,9 @@ import type { ActionResult } from "../types/types.ts";
 import usePageTitle from "../scripts/usePageTitle.ts";
 import {
   getAssessments,
+  getNotifications,
   getScheduled,
+  type Notification,
   type ScheduledAssessment,
   getTags,
   type AssessmentSummary,
@@ -16,23 +18,20 @@ import {
 } from "../scripts/dashApi.ts";
 import { listUpcomingEvents, type EventSummary } from "../scripts/eventsApi.ts";
 
-const notifications = [
-  {
-    title: "Your test was published",
-    detail: "Improvisation Essentials is now public",
-    time: "2h ago",
-  },
-  {
-    title: "New comment on your answer",
-    detail: "Mara Chen replied to your discussion",
-    time: "Yesterday",
-  },
-  {
-    title: "You earned a new badge",
-    detail: "Completed 5 tests",
-    time: "3d ago",
-  },
-];
+function timeAgo(value: string) {
+  const seconds = Math.max(
+    1,
+    Math.floor((Date.now() - new Date(value).getTime()) / 1000),
+  );
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(value).toLocaleDateString();
+}
 
 function VerifyEmailBanner({
   setCloseEmail,
@@ -87,6 +86,8 @@ function App() {
   const [testCount, setTestCount] = useState(0);
   const [offset, setOffset] = useState(0);
   const [tags, setTags] = useState<TagCount[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
   const PAGE_SIZE = 5;
@@ -118,6 +119,13 @@ function App() {
     getTags()
       .then(setTags)
       .catch(() => setTags([]));
+  }, []);
+
+  useEffect(() => {
+    getNotifications(20)
+      .then(setNotifications)
+      .catch(() => setNotifications([]))
+      .finally(() => setNotificationsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -455,8 +463,18 @@ function App() {
               Notifications
             </h1>
             <div className="flex flex-col gap-5">
-              {notifications.map((notification, idx) => (
-                <div className="w-full rounded-xl bg-surface p-5" key={idx}>
+              {notificationsLoading && (
+                <div className="w-full rounded-xl bg-surface p-5 text-sm text-muted">
+                  Loading notifications…
+                </div>
+              )}
+              {!notificationsLoading && notifications.length === 0 && (
+                <div className="w-full rounded-xl bg-surface p-5 text-sm text-muted">
+                  No notifications yet.
+                </div>
+              )}
+              {notifications.map((notification) => (
+                <div className="w-full rounded-xl bg-surface p-5" key={notification.id}>
                   <h2 className="text-base font-semibold text-ink">
                     {notification.title}
                   </h2>
@@ -464,7 +482,7 @@ function App() {
                     {notification.detail}
                   </p>
                   <p className="mt-3 text-xs font-medium uppercase text-dim">
-                    {notification.time}
+                    {timeAgo(notification.createdAt)}
                   </p>
                 </div>
               ))}
