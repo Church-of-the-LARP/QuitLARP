@@ -25,7 +25,7 @@ test:
 	docker compose run --rm --no-deps backend go test ./...
 
 psql:
-	docker compose exec db sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+	docker compose exec db psql -U app -d app
 
 reset:
 	docker compose down -v
